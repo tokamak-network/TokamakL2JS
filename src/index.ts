@@ -1,4 +1,4 @@
-export { poseidon, getEddsaPublicKey } from './crypto/index.js'
+export * from './crypto/index.js'
 export * from './tx/index.js'
 export * from './stateManager/index.js'
 export * from './params/index.js'
