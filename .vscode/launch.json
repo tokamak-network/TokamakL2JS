@@ -1,0 +1,27 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Create a TokamakL2StateManager",
+      "runtimeExecutable": "tsx",
+      "program": "${workspaceFolder}/examples/stateManager/create-state-manager.ts",
+      "args": ["${workspaceFolder}/examples/stateManager/config.json"],
+      "cwd": "${workspaceFolder}",
+      "skipFiles": ["<node_internals>/**"],
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Create a TokamakL2Tx",
+      "runtimeExecutable": "tsx",
+      "program": "${workspaceFolder}/examples/transaction/create-tx.ts",
+      "args": ["${workspaceFolder}/examples/transaction/config.json"],
+      "cwd": "${workspaceFolder}",
+      "skipFiles": ["<node_internals>/**"],
+      "console": "integratedTerminal"
+    }
+  ]
+}
