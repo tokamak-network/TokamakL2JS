@@ -1,6 +1,6 @@
 {
   "name": "tokamak-l2js",
-  "version": "0.5.0",
+  "version": "0.0.1",
   "description": "TokamakL2JS - Tokamak Network L2 transaction and state utilities.",
   "keywords": [
     "tokamak",
@@ -25,20 +25,23 @@
   "exports": {
     ".": {
       "import": "./dist/index.js",
+      "require": "./dist/cjs/index.js",
       "types": "./dist/index.d.ts"
     }
   },
   "files": [
     "dist",
-    "src",
     "LICENSE-MIT",
     "LICENSE-APACHE",
     "NOTICE",
     "README.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "clean": "rm -rf dist"
+    "build": "npm run build:esm && npm run build:cjs",
+    "build:esm": "tsc -p tsconfig.json",
+    "build:cjs": "tsc -p tsconfig.cjs.json && node ./scripts/write-cjs-package.cjs",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "@ethereumjs/common": "^10.0.0",
