@@ -25,3 +25,7 @@ tsx ./create-state-manager.ts ./config.json
 cd ./examples/transaction
 tsx ./create-tx.ts ./config.json
 ```
+
+# License
+TokamakL2JS is dual-licensed under MIT or Apache-2.0 at your option.
+See `LICENSE-MIT` and `LICENSE-APACHE` for details.
