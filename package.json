@@ -1,6 +1,6 @@
 {
   "name": "tokamak-l2js",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "description": "TokamakL2JS - Tokamak Network L2 transaction and state utilities.",
   "keywords": [
     "tokamak",

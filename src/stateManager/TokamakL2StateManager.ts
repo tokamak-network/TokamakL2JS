@@ -99,6 +99,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             registeredL2KeyBigInts.add(keyL2BigInt);
             this._registeredKeys.push(keys.L2);
         }
+        await this.flush();
     }
 
     async fetchStorageFromSnapshot(snapshot: StateSnapshot, opts: TokamakL2StateManagerOpts): Promise<void> {
@@ -117,6 +118,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             const keyBytes = hexToBytes(addHexPrefix(entry.key));
             await this.putStorage(contractAddress, keyBytes, vBytes);
         }
+        await this.flush();
     }
 
 
