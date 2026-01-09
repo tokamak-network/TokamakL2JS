@@ -49,7 +49,7 @@
     "@ethereumjs/statemanager": "^10.0.0",
     "@ethereumjs/tx": "^10.0.0",
     "@ethereumjs/util": "^10.0.0",
-    "@noble/curves": "1.9.0",
+    "@noble/curves": "1.9.7",
     "@zk-kit/imt": "2.0.0-beta.8",
     "dotenv": "^17.2.0",
     "ethereum-cryptography": "^3.0.0",
