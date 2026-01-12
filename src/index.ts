@@ -1,5 +1,6 @@
 export * from './crypto/index.js'
 export * from './tx/index.js'
+export * from './block/index.js'
 export * from './stateManager/index.js'
 export * from './params/index.js'
 export { getUserStorageKey, fromEdwardsToAddress } from './utils/utils.js'
