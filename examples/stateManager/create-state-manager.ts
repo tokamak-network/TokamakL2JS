@@ -121,7 +121,7 @@ const main = async () => {
 
   const stateManager = await createTokamakL2StateManagerFromL1RPC(rpcUrl, stateManagerOpts);
   console.log('TokamakL2StateManager created.');
-  console.log(`Merkle root: ${String(stateManager.initialMerkleTree.root)}`);
+  console.log(`Merkle root: ${String(stateManager.getMerkleTree(stateManager.lastMerkleTreeIndex).root)}`);
 };
 
 void main().catch((err) => {
