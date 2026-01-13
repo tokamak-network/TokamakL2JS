@@ -161,6 +161,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         if (permutation !== undefined) {
             this._permuteRegisteredKeys(permutation);
         }
+        await this.flush();
         const merkleTree = await TokamakL2MerkleTree.buildFromTokamakL2StateManager(this)
         const _root = merkleTree.root
         let root: Uint8Array = new Uint8Array([])
@@ -177,6 +178,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
     }
 
     public async getMerkleProof(leafIndex: number): Promise<IMTMerkleProof> {
+        await this.flush();
         const merkleTree = await TokamakL2MerkleTree.buildFromTokamakL2StateManager(this)
         // pathIndices of this proof generation is incorrect. The indices are based on binary, but we are using 4-ary.
         return merkleTree.createProof(leafIndex)
@@ -200,12 +202,11 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
     public get cachedOpts() {return this._cachedOpts}
 
     public async captureStateSnapshot(prevSnapshot: StateSnapshot): Promise<StateSnapshot> {
-
         if (hexToBigInt(addHexPrefix(prevSnapshot.contractAddress)) !==  bytesToBigInt(this.cachedOpts!.contractAddress.bytes)) {
             throw new Error ('Mismatch between contract addresses of the previous state snapshot and the current state.')
         }
         const contractAddress = this.cachedOpts!.contractAddress;
-
+        await this.flush();
         const getUpdatedEntry = async (entry:  {key: string; value: string;}): Promise<{key: string; value: string;}> => {
             const keyBytes = hexToBytes(addHexPrefix(entry.key));
             const value = await this.getStorage(contractAddress, keyBytes);
