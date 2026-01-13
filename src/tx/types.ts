@@ -1,9 +1,10 @@
+import { LegacyTxData } from "@ethereumjs/tx";
 import { Address } from "@ethereumjs/util"
 
 /**
  * Legacy {@link Transaction} Data
  */
-export type TokamakL2TxData = {
+export interface TokamakL2TxData extends LegacyTxData {
   /**
    * The transaction's nonce.
    */

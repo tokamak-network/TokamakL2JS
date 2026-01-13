@@ -26,6 +26,7 @@ export function createTokamakL2Block(blockData: TokamakL2BlockData, opts?: Block
     // parse transactions
     const transactions: TokamakL2Tx[] = [];
     for (const txData of txsData) {
+        txData.gasLimit = header.gasLimit;
         const tx = createTokamakL2Tx(txData, {
             ...opts,
             // Use header common in case of setHardfork being activated
