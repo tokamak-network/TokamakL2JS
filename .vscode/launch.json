@@ -6,8 +6,8 @@
       "request": "launch",
       "name": "Create a TokamakL2StateManager",
       "runtimeExecutable": "tsx",
-      "program": "${workspaceFolder}/examples/stateManager/create-state-manager.ts",
-      "args": ["${workspaceFolder}/examples/stateManager/config.json"],
+      "program": "${workspaceFolder}/examples/stateManager/fromRPC/create-state-manager.ts",
+      "args": ["${workspaceFolder}/examples/stateManager/fromRPC/config.json"],
       "cwd": "${workspaceFolder}",
       "skipFiles": ["<node_internals>/**"],
       "console": "integratedTerminal"

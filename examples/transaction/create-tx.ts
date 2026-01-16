@@ -2,7 +2,6 @@
 
 import { promises as fs } from 'fs';
 import { Common, CommonOpts, Mainnet } from '@ethereumjs/common';
-import { parseBigIntValue, parseHexString } from '../utility/parse.js';
 import {
   bytesToHex,
   concatBytes,
@@ -30,19 +29,6 @@ type TxConfig = {
   amount: `0x${string}`;
 };
 
-const loadConfig = async (configPath: string): Promise<TxConfig> => {
-  const configRaw = JSON.parse(await fs.readFile(configPath, 'utf8'));
-
-  return {
-    senderSeed: String(configRaw.senderSeed ?? ''),
-    recipientSeed: String(configRaw.recipientSeed ?? ''),
-    txNonce: parseBigIntValue(configRaw.txNonce, 'txNonce'),
-    contractAddress: parseHexString(configRaw.contractAddress, 'contractAddress'),
-    transferSelector: parseHexString(configRaw.transferSelector, 'transferSelector'),
-    amount: parseHexString(configRaw.amount, 'amount'),
-  };
-};
-
 const toSeedBytes = (seed: string) => setLengthLeft(utf8ToBytes(seed), 32);
 
 const main = async () => {
@@ -51,7 +37,7 @@ const main = async () => {
     throw new Error('Config file path required. Usage: tsx examples/create-tx.ts <config.json>');
   }
 
-  const config = await loadConfig(configPath);
+  const config: TxConfig = JSON.parse(await fs.readFile(configPath, 'utf8'));
 
   const senderSignature = bytesToHex(jubjub.utils.randomPrivateKey(toSeedBytes(config.senderSeed)));
   const recipientSignature = bytesToHex(jubjub.utils.randomPrivateKey(toSeedBytes(config.recipientSeed)));

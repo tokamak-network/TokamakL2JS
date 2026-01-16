@@ -62,16 +62,17 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
     async fetchStorageFromRPC(rpcUrl: string, opts: TokamakL2StateManagerOpts): Promise<void> {
         const provider = new ethers.JsonRpcProvider(rpcUrl)
 
-        const contractAddress = new Address(toBytes(opts.contractAddress))
+        const contractAddress = opts.contractAddress
         if (await this.getAccount(contractAddress) === undefined) {
             throw new Error('TokamakL2StateManager is not initialized.')
         }
         if (opts.blockNumber === undefined ) {
             throw new Error('Creating TokamakL2StateManager from RPC requires a block number.')
         }
-        const byteCodeStr = await provider.getCode(contractAddress.toString(), opts.blockNumber)
-        await this.putCode(contractAddress, hexToBytes(addHexPrefix(byteCodeStr)))
-        
+        for (const addr of opts.callCodeAddresses) {
+            const byteCodeStr = await provider.getCode(addr.toString(), opts.blockNumber)
+            await this.putCode(contractAddress, hexToBytes(addHexPrefix(byteCodeStr)))
+        }
         if (opts.initStorageKeys === undefined) {
             throw new Error('Creating TokamakL2StateManager from RPC requires L1 and L2 key pairs.')
         }
@@ -103,12 +104,9 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
     }
 
     async fetchStorageFromSnapshot(snapshot: StateSnapshot, opts: TokamakL2StateManagerOpts): Promise<void> {
-        if (opts.contractCode === undefined) {
-            throw new Error('Creating TokamakL2StateManager using StateSnapshot requires a contract code.')
+        for (const codeInfo of opts.contractCodes) {
+            await this.putCode(codeInfo.address, hexToBytes(codeInfo.code));
         }
-        const contractAddress = new Address(toBytes(opts.contractAddress));
-        await this.putCode(contractAddress, hexToBytes(addHexPrefix(opts.contractCode)));
-
         if (this._registeredKeys !== null) {
             throw new Error('Cannot rewrite registered keys')
         }
@@ -116,7 +114,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         for (const entry of [...snapshot.storageEntries, ...snapshot.preAllocatedLeaves]) {
             const vBytes = hexToBytes(addHexPrefix(entry.value));
             const keyBytes = hexToBytes(addHexPrefix(entry.key));
-            await this.putStorage(contractAddress, keyBytes, vBytes);
+            await this.putStorage(opts.contractAddress, keyBytes, vBytes);
         }
         await this.flush();
     }

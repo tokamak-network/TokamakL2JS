@@ -1,5 +1,5 @@
 {
-  "senderIndex": "Sender's L2 wallet",
+  "senderSeed": "Sender's L2 wallet",
   "recipientSeed": "Recepient's L2 wallet",
   "txNonce": 0,
   "contractAddress": "0x2be5e8c109e2197D077D13A82dAead6a9b3433C5",

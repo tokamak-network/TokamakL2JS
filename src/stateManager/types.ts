@@ -9,7 +9,11 @@ export type TokamakL2StateManagerOpts = {
         L1: Uint8Array,
         L2: Uint8Array,
     }[],
-    contractCode?: string,
+    contractCodes?: {
+        address: Address,
+        code: `0x${string}`,
+    }[]
+    callCodeAddresses?: Address[],
 }
 
 // StateSnapshot type definition (matches usage in adapter)
