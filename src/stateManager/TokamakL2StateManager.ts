@@ -71,7 +71,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         }
         for (const addr of opts.callCodeAddresses) {
             const byteCodeStr = await provider.getCode(addr.toString(), opts.blockNumber)
-            await this.putCode(contractAddress, hexToBytes(addHexPrefix(byteCodeStr)))
+            await this.putCode(addr, hexToBytes(addHexPrefix(byteCodeStr)))
         }
         if (opts.initStorageKeys === undefined) {
             throw new Error('Creating TokamakL2StateManager from RPC requires L1 and L2 key pairs.')
