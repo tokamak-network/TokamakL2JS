@@ -5,7 +5,7 @@ export const ANY_LARGE_GAS_LIMIT = 9999999999999999n;
 export const ANY_LARGE_GAS_PRICE = 9999999n;
 
 // Params to feed channel interface
-export const DST_NONCE = setLengthLeft(utf8ToBytes("TokamakL2JS‑EDDSA‑NONCE‑v1"), 32);
+export const DST_NONCE = setLengthLeft(utf8ToBytes("TokamakAuth‑EDDSA‑NONCE‑v1"), 32);
 
 // Params to feed QAP Compiler 
 export const POSEIDON_INPUTS = 2;
