@@ -5,7 +5,7 @@ import { IMT, IMTHashFunction, IMTMerkleProof, IMTNode } from "@zk-kit/imt"
 import { addHexPrefix, Address, bigIntToBytes, bytesToBigInt, bytesToHex, concatBytes, createAccount, hexToBigInt, hexToBytes, setLengthLeft, toBytes } from "@ethereumjs/util";
 import { ethers } from "ethers";
 import { RLP } from "@ethereumjs/rlp";
-import { MAX_MT_LEAVES, MT_DEPTH, MT_LEAF_PREFIX, POSEIDON_INPUTS } from "../params/index.js";
+import { MAX_MT_LEAVES, MT_DEPTH, POSEIDON_INPUTS } from "../params/index.js";
 import { poseidon, poseidon_raw } from "../crypto/index.js";
 import { batchBigIntTo32BytesEach } from "../utils/utils.js";
 
@@ -128,12 +128,10 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             const key = this.registeredKeys![index];
             let leafData: Uint8Array;
             if (key === undefined) {
-                leafData = batchBigIntTo32BytesEach(0n, 0n, 0n, 0n);
+                leafData = batchBigIntTo32BytesEach(0n, 0n);
             } else {
                 const val = await this.getStorage(contractAddress, key)
                 leafData = concatBytes(...[
-                    MT_LEAF_PREFIX, 
-                    contractAddress.bytes, 
                     key, 
                     val
                 ].map(raw => setLengthLeft(raw, 32)));
