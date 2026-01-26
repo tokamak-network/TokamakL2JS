@@ -2,11 +2,12 @@ import { MerkleStateManager } from "@ethereumjs/statemanager";
 import { StateSnapshot, TokamakL2StateManagerOpts } from "./types.js";
 import { StateManagerInterface } from "@ethereumjs/common";
 import { IMT, IMTHashFunction, IMTMerkleProof, IMTNode } from "@zk-kit/imt"
-import { addHexPrefix, Address, bigIntToBytes, bytesToBigInt, bytesToHex, createAccount, hexToBigInt, hexToBytes, toBytes } from "@ethereumjs/util";
+import { addHexPrefix, Address, bigIntToBytes, bytesToBigInt, bytesToHex, concatBytes, createAccount, hexToBigInt, hexToBytes, setLengthLeft, toBytes } from "@ethereumjs/util";
 import { ethers } from "ethers";
 import { RLP } from "@ethereumjs/rlp";
-import { MAX_MT_LEAVES, MT_DEPTH, POSEIDON_INPUTS } from "../params/index.js";
-import { poseidon_raw } from "../crypto/index.js";
+import { MAX_MT_LEAVES, MT_DEPTH, MT_LEAF_PREFIX, POSEIDON_INPUTS } from "../params/index.js";
+import { poseidon, poseidon_raw } from "../crypto/index.js";
+import { batchBigIntTo32BytesEach } from "../utils/utils.js";
 
 
 
@@ -121,16 +122,23 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
 
 
     public async convertLeavesIntoMerkleTreeLeaves(): Promise<bigint[]> {
-        const contractAddress = new Address(toBytes(this.cachedOpts!.contractAddress))
-        const leaves = new Array<bigint>(MAX_MT_LEAVES)
+        const contractAddress = new Address(toBytes(this.cachedOpts!.contractAddress));
+        const leaves = new Array<bigint>(MAX_MT_LEAVES);
         for (var index = 0; index < MAX_MT_LEAVES; index++) {
-            const key = this.registeredKeys![index]
+            const key = this.registeredKeys![index];
+            let leafData: Uint8Array;
             if (key === undefined) {
-                leaves[index] = poseidon_raw([0n, 0n])
+                leafData = batchBigIntTo32BytesEach(0n, 0n, 0n, 0n);
             } else {
                 const val = await this.getStorage(contractAddress, key)
-                leaves[index] = poseidon_raw([bytesToBigInt(key), bytesToBigInt(val)])
+                leafData = concatBytes(...[
+                    MT_LEAF_PREFIX, 
+                    contractAddress.bytes, 
+                    key, 
+                    val
+                ].map(raw => setLengthLeft(raw, 32)));
             }
+            leaves[index] = bytesToBigInt(poseidon(leafData));
         }
         return leaves
     }
