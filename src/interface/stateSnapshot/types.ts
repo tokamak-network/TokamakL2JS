@@ -1,4 +1,3 @@
-// StateSnapshot type definition (matches usage in adapter)
 export type StateSnapshot = {
   stateRoots: string[];
   storageAddresses: string[];

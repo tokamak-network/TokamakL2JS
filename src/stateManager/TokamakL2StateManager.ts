@@ -207,11 +207,8 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         return merkleTrees.merkleTrees.map(tree => treeNodeToBigint(tree.root))
     }
 
-    public async getMerkleProof(treeIndex: [number, number]): Promise<IMTMerkleProof> {
-        await this.flush();
-        const merkleTrees = await TokamakL2MerkleTrees.buildFromTokamakL2StateManager(this)
-        // pathIndices of this proof generation is incorrect. The indices are based on binary, but we are using 4-ary.
-        return merkleTrees.merkleTrees[treeIndex[0]].createProof(treeIndex[1])
+    public getMerkleProof(treeIndex: [number, number]): IMTMerkleProof {
+        return this.initialMerkleTrees.merkleTrees[treeIndex[0]].createProof(treeIndex[1])
     }
 
     public get registeredKeys() {return this._registeredKeys}
