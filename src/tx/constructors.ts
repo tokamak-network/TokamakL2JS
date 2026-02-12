@@ -3,7 +3,7 @@ import { TokamakL2Tx } from "./TokamakL2Tx.js"
 import { TokamakL2TxData } from "./types.js"
 import { EthereumJSErrorWithoutCode, RLP } from "@ethereumjs/rlp"
 import { Address, bytesToBigInt, bytesToHex, toBytes, validateNoLeadingZeroes } from "@ethereumjs/util"
-import { ANY_LARGE_GAS_LIMIT, ANY_LARGE_GAS_PRICE } from "../params/index.js"
+import { ANY_LARGE_GAS_LIMIT, ANY_LARGE_GAS_PRICE } from "../interface/params/index.js"
 
 
 export function createTokamakL2Tx(txData: TokamakL2TxData, opts: TxOptions): TokamakL2Tx {
