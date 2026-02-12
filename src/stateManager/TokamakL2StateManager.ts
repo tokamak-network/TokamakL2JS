@@ -176,17 +176,17 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         if (this._registeredKeys === null) {
             throw new Error('Registered storage keys must be permuted after init.')
         }
-        for (const registeredKeysForAddress of this.registeredKeys) {
+        for (const [idx, registeredKeysForAddress] of this.registeredKeys.entries()) {
             const address = registeredKeysForAddress.address;
             const permutation = permutations.find(entry => entry.address.equals(address)).permutation;
             const permutedKeys: Uint8Array[] = registeredKeysForAddress.keys.map((arr) => new Uint8Array(arr));
             for (const [newIdx, oldIdx] of permutation.entries()) {
                 permutedKeys[newIdx] = registeredKeysForAddress.keys[oldIdx].slice();
             }
-            this._registeredKeys.push({
+            this._registeredKeys[idx] = {
                 address,
                 keys: permutedKeys
-            });
+            };
         }
     }
 
