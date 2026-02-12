@@ -45,3 +45,15 @@
 - Renamed `contractAddress` to `entryContractAddress`.
 - Preserved original address/key values by mapping them into `storageConfigs[0]`.
 - Validation run: `node -e "JSON.parse(...)"` returned `ok`.
+
+## Task: Return `[-1, -1]` when address is missing in `getMerkleTreeLeafIndex`
+
+### Plan
+- [x] Update `getMerkleTreeLeafIndex` in `src/stateManager/TokamakL2StateManager.ts` to early-return `[-1, -1]` when `addressIndex === -1`.
+- [x] Run targeted verification to ensure no regressions from this change.
+- [x] Add review notes and outcomes.
+
+### Review
+- Added early guard in `getMerkleTreeLeafIndex` to return `[-1, -1]` immediately if no matching address is found.
+- Preserved existing behavior for valid address matches (`leafIndex` is still computed by key lookup).
+- Validation run: `npm run build` passed (`build:esm` + `build:cjs`).
