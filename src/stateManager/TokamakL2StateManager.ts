@@ -64,7 +64,10 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             const contractAccount = createAccount({nonce: 0n, balance: 0n, storageRoot: POSEIDON_RLP, codeHash: POSEIDON_NULL});
             await this.putAccount(address, contractAccount);
         }
-        const addresses: Address[] = opts.initStorageKeys.map(entry => entry.address);
+        if (opts.storageAddresses === undefined && opts.initStorageKeys === undefined) {
+            throw new Error('Initializing TokamakL2StateManager requires storage addresses')
+        }
+        const addresses: Address[] = opts.storageAddresses ?? opts.initStorageKeys.map(entry => entry.address);
         await Promise.all(addresses.map(addr => openAccount(addr)));
     }
 
