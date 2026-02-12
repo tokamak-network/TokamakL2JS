@@ -57,3 +57,16 @@
 - Added early guard in `getMerkleTreeLeafIndex` to return `[-1, -1]` immediately if no matching address is found.
 - Preserved existing behavior for valid address matches (`leafIndex` is still computed by key lookup).
 - Validation run: `npm run build` passed (`build:esm` + `build:cjs`).
+
+## Task: Fix Snapshot Init Merkle Root Reconstruction
+
+### Plan
+- [x] Fix leaf construction in `convertLeavesIntoMerkleTreeLeavesForAddress` to index registered keys correctly.
+- [x] Correct snapshot root mismatch check in `initTokamakExtendsFromSnapshot` to fail when any root mismatches.
+- [x] Run build verification and capture outcomes.
+- [x] Add review notes and conclusions.
+
+### Review
+- Root cause identified: leaf reconstruction used `registeredKeysForAddress[index]` (object index access) instead of `registeredKeysForAddress.keys[index]`, causing keys to resolve as `undefined` and leaf hashing to collapse to zero-filled inputs.
+- Fixed snapshot validation logic from `every(mismatch)` to `some(mismatch)`, so initialization fails when any reconstructed root diverges from snapshot roots.
+- Validation run: `npm run build` passed (`build:esm` + `build:cjs`).
