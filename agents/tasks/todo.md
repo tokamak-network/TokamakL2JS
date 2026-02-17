@@ -1,5 +1,23 @@
 # Task Log
 
+## Task: Enforce remote-main synchronization before publish
+
+### Plan
+- [x] Add release-gate check that requires local `HEAD` to match remote `origin/main` latest commit before publish.
+- [x] Update release skill docs/policy to reflect mandatory push/merge to remote main before publish.
+- [x] Run script validation and capture outcomes.
+- [x] Add review notes and outcomes.
+
+### Review
+- Added remote synchronization guard in release gate:
+  - verify `refs/remotes/origin/main` exists
+  - fetch latest `origin/main`
+  - require `HEAD` SHA to match `origin/main` tip SHA
+- Updated release docs/policy to include remote-main sync as mandatory publish precondition and blocker.
+- Validation runs:
+  - `bash -n agents/skills/upgrade-release-readiness-guardrail/scripts/release-readiness-gate.sh` -> `OK`
+  - `bash agents/skills/upgrade-release-readiness-guardrail/scripts/release-readiness-gate.sh HEAD~1` -> failed as expected with remote sync failure path (sandbox prevented updating `.git/FETCH_HEAD`), exit code `7`.
+
 ## Task: Enforce version-upgrade commit naming rule for publish
 
 ### Plan

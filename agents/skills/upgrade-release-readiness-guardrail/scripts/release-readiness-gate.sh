@@ -16,6 +16,28 @@ mkdir -p "${NPM_CACHE_DIR}"
 
 echo "[gate] base ref: ${BASE_REF}"
 
+remote_sync_exit=0
+if ! git show-ref --verify --quiet refs/remotes/origin/main; then
+  echo "[gate] missing ref refs/remotes/origin/main. Run 'git fetch origin main' first." >&2
+  remote_sync_exit=7
+fi
+
+if [[ "${remote_sync_exit}" -eq 0 ]]; then
+  if ! git fetch origin main --quiet; then
+    echo "[gate] failed to fetch origin/main. Ensure network/auth access before publish." >&2
+    remote_sync_exit=7
+  fi
+fi
+
+if [[ "${remote_sync_exit}" -eq 0 ]]; then
+  head_sha="$(git rev-parse HEAD)"
+  remote_main_sha="$(git rev-parse refs/remotes/origin/main)"
+  if [[ "${head_sha}" != "${remote_main_sha}" ]]; then
+    echo "[gate] HEAD (${head_sha}) must match origin/main tip (${remote_main_sha}) before publish." >&2
+    remote_sync_exit=7
+  fi
+fi
+
 api_exit=0
 node agents/skills/upgrade-public-api-guardrail/scripts/check-public-api.mjs \
   --base "${BASE_REF}" \
@@ -128,6 +150,7 @@ NODE
 
 {
   echo "base_ref=${BASE_REF}"
+  echo "remote_sync_exit=${remote_sync_exit}"
   echo "api_exit=${api_exit}"
   echo "state_exit=${state_exit}"
   echo "build_exit=${build_exit}"
@@ -140,7 +163,7 @@ NODE
 
 echo "[gate] summary saved: ${SUMMARY_TXT}"
 
-for code in "${api_exit}" "${state_exit}" "${build_exit}" "${tx_exit}" "${crypto_exit}" "${pack_exit}" "${artifact_exit}" "${semver_exit}"; do
+for code in "${remote_sync_exit}" "${api_exit}" "${state_exit}" "${build_exit}" "${tx_exit}" "${crypto_exit}" "${pack_exit}" "${artifact_exit}" "${semver_exit}"; do
   if [[ "${code}" -ne 0 ]]; then
     echo "[gate] failed" >&2
     exit "${code}"

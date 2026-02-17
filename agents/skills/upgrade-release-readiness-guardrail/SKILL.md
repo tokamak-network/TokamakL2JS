@@ -14,6 +14,7 @@ bash agents/skills/upgrade-release-readiness-guardrail/scripts/release-readiness
 ```
 
 This command runs:
+- remote-main sync check (`HEAD` == latest `origin/main`)
 - public API gate script
 - state-manager guard script
 - tx guard smoke script
@@ -39,6 +40,7 @@ This command runs:
 
 ## Fail Conditions
 
+- current commit is not exactly the latest `origin/main` commit
 - public API breaking changes without major version bump
 - no version bump in `package.json` compared to base ref
 - version bumped but missing commit subject `NPM version upgrade to <version>`
