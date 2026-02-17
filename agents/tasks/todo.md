@@ -1,5 +1,48 @@
 # Task Log
 
+## Task: Reorganize guardrail skills into six-skill upgrade suite
+
+### Plan
+- [x] Rename existing `l2-upgrade-*` skills into requested `upgrade-*` naming and role mapping.
+- [x] Strengthen `upgrade-public-api-guardrail` to include class constructors/member method compatibility checks for all APIs exported via `src/index.ts`.
+- [x] Keep `upgrade-release-readiness-guardrail` behavior while updating it to the renamed skill paths.
+- [x] Create `upgrade-crypto-guardrail` for `src/crypto/` upgrades with executable checks.
+- [x] Create `upgrade-state-manager-guardrail` from the current state-invariant guardrail with updated scope/name.
+- [x] Create `upgrade-tx-guardrail` from tx/crypto guardrail by removing crypto-focused content.
+- [x] Create `upgrade-block-guardrail` for `src/block/` upgrades with executable checks.
+- [x] Run representative verification commands and record results.
+- [x] Add review notes and outcomes.
+
+### Review
+- Reorganized `agents/skills/` into six skills:
+  - `upgrade-public-api-guardrail`
+  - `upgrade-release-readiness-guardrail`
+  - `upgrade-crypto-guardrail`
+  - `upgrade-state-manager-guardrail`
+  - `upgrade-tx-guardrail`
+  - `upgrade-block-guardrail`
+- Removed old `l2-upgrade-*` naming by moving folders and updating all internal script references.
+- Upgraded public API guardrail implementation (`scripts/check-public-api.mjs`) to track symbol-level API from `src/index.ts` re-export graph, including:
+  - exported function signature changes
+  - exported class constructor changes
+  - exported class public method/accessor changes
+  - existing config-type breaking checks (`src/interface/configuration/types.ts`)
+- Kept release readiness guardrail purpose while updating path wiring and splitting tx/crypto checks into:
+  - `upgrade-tx-guardrail/scripts/tx-smoke.mjs`
+  - `upgrade-crypto-guardrail/scripts/crypto-smoke.mjs`
+- Added two new practical skills with executable smoke checks:
+  - crypto guardrail with fixed vectors (`upgrade-crypto-guardrail`)
+  - block guardrail with block assembly vector checks (`upgrade-block-guardrail`)
+- Validation runs:
+  - `npm run build` passed.
+  - `node agents/skills/upgrade-public-api-guardrail/scripts/check-public-api.mjs --base HEAD~1` passed.
+  - `bash agents/skills/upgrade-state-manager-guardrail/scripts/check-state-manager-guards.sh` passed.
+  - `node agents/skills/upgrade-state-manager-guardrail/scripts/validate-state-snapshot.mjs /tmp/tokamak-snapshot-valid.json` passed.
+  - `node agents/skills/upgrade-tx-guardrail/scripts/tx-smoke.mjs` passed.
+  - `node agents/skills/upgrade-crypto-guardrail/scripts/crypto-smoke.mjs` passed.
+  - `node agents/skills/upgrade-block-guardrail/scripts/block-smoke.mjs` passed.
+  - `bash agents/skills/upgrade-release-readiness-guardrail/scripts/release-readiness-gate.sh HEAD~1` passed.
+
 ## Task: Evolve all four upgrade guardrail skills into practical workflows
 
 ### Plan

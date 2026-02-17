@@ -2,7 +2,7 @@
 set -euo pipefail
 
 BASE_REF="${1:-HEAD~1}"
-OUT_DIR="${2:-agents/skills/l2-upgrade-release-readiness-guardrail/out}"
+OUT_DIR="${2:-agents/skills/upgrade-release-readiness-guardrail/out}"
 
 mkdir -p "${OUT_DIR}"
 
@@ -17,7 +17,7 @@ mkdir -p "${NPM_CACHE_DIR}"
 echo "[gate] base ref: ${BASE_REF}"
 
 api_exit=0
-if ! node agents/skills/l2-upgrade-public-api-guardrail/scripts/check-public-api.mjs \
+if ! node agents/skills/upgrade-public-api-guardrail/scripts/check-public-api.mjs \
   --base "${BASE_REF}" \
   --report "${PUBLIC_API_REPORT_MD}" \
   --json "${PUBLIC_API_REPORT_JSON}"; then
@@ -25,7 +25,7 @@ if ! node agents/skills/l2-upgrade-public-api-guardrail/scripts/check-public-api
 fi
 
 state_exit=0
-if ! bash agents/skills/l2-upgrade-state-invariant-guardrail/scripts/check-state-manager-guards.sh; then
+if ! bash agents/skills/upgrade-state-manager-guardrail/scripts/check-state-manager-guards.sh; then
   state_exit=$?
 fi
 
@@ -35,8 +35,13 @@ if ! npm run build; then
 fi
 
 tx_exit=0
-if ! node agents/skills/l2-upgrade-tx-crypto-guardrail/scripts/tx-crypto-smoke.mjs; then
+if ! node agents/skills/upgrade-tx-guardrail/scripts/tx-smoke.mjs; then
   tx_exit=$?
+fi
+
+crypto_exit=0
+if ! node agents/skills/upgrade-crypto-guardrail/scripts/crypto-smoke.mjs; then
+  crypto_exit=$?
 fi
 
 pack_exit=0
@@ -121,6 +126,7 @@ fi
   echo "state_exit=${state_exit}"
   echo "build_exit=${build_exit}"
   echo "tx_exit=${tx_exit}"
+  echo "crypto_exit=${crypto_exit}"
   echo "pack_exit=${pack_exit}"
   echo "artifact_exit=${artifact_exit}"
   echo "semver_exit=${semver_exit}"
@@ -128,7 +134,7 @@ fi
 
 echo "[gate] summary saved: ${SUMMARY_TXT}"
 
-for code in "${api_exit}" "${state_exit}" "${build_exit}" "${tx_exit}" "${pack_exit}" "${artifact_exit}" "${semver_exit}"; do
+for code in "${api_exit}" "${state_exit}" "${build_exit}" "${tx_exit}" "${crypto_exit}" "${pack_exit}" "${artifact_exit}" "${semver_exit}"; do
   if [[ "${code}" -ne 0 ]]; then
     echo "[gate] failed" >&2
     exit "${code}"

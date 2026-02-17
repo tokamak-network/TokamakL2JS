@@ -1,5 +1,5 @@
 ---
-name: l2-upgrade-release-readiness-guardrail
+name: upgrade-release-readiness-guardrail
 description: Gate TokamakL2JS upgrade releases before npm publish. Use when versioning, preparing release commits, updating build/package metadata, or publishing changes that may affect downstream integrators.
 ---
 
@@ -10,13 +10,14 @@ Use this skill as the final pre-publish gate.
 ## Quick Start
 
 ```bash
-bash agents/skills/l2-upgrade-release-readiness-guardrail/scripts/release-readiness-gate.sh origin/main
+bash agents/skills/upgrade-release-readiness-guardrail/scripts/release-readiness-gate.sh origin/main
 ```
 
 This command runs:
 - public API gate script
-- state guard script
-- tx/crypto smoke script
+- state-manager guard script
+- tx guard smoke script
+- crypto guard smoke script
 - `npm run build`
 - `npm pack --dry-run`
 - semver sanity check vs base ref
@@ -26,7 +27,7 @@ This command runs:
 1. Choose base ref representing the latest released commit (tag or default branch).
 2. Run `release-readiness-gate.sh <base-ref>`.
 3. Review output artifacts in:
-`agents/skills/l2-upgrade-release-readiness-guardrail/out/`
+`agents/skills/upgrade-release-readiness-guardrail/out/`
 4. Block release on any failure.
 
 ## Output Artifacts
