@@ -5,35 +5,39 @@ description: Guard transaction and cryptography behavior for TokamakL2JS upgrade
 
 # Tx/Crypto Guardrail
 
-Use this workflow to prevent signature, serialization, and address-derivation regressions.
+Use this skill to block signature, serialization, and address-derivation regressions.
 
-## 1. Scope behavior-critical changes
+## Quick Start
 
-1. Inspect diffs in `src/tx/`, `src/crypto/`, and related helpers in `src/utils/`.
-2. Mark changes touching message layout, raw encoding, signing, verification, or sender recovery.
+```bash
+npm run build
+node agents/skills/l2-upgrade-tx-crypto-guardrail/scripts/tx-crypto-smoke.mjs
+```
 
-## 2. Preserve transaction wire compatibility
+## What the Smoke Check Verifies
 
-1. Keep tx raw field ordering and count stable.
-2. Keep RLP decode/encode round-trip behavior stable for valid payloads.
-3. Keep constructor validation semantics stable unless explicit migration is planned.
+1. Deterministic key derivation from fixed signatures.
+2. `createTokamakL2Tx -> sign -> verifySignature` happy-path success.
+3. `getSenderAddress()` equals address derived from sender public key.
+4. RLP serialization round-trip with `createTokamakL2TxFromRLP`.
+5. `poseidon_raw` rejects invalid input length.
+6. `poseidon(new Uint8Array())` returns 32-byte digest.
 
-## 3. Preserve signature semantics
+## Workflow
 
-1. Keep message-to-sign layout deterministic.
-2. Keep `sign -> verifySignature -> getSenderAddress` round-trip behavior consistent.
-3. Keep sender public key initialization constraints and mismatch checks intact.
+1. Run smoke script before and after tx/crypto changes.
+2. If smoke output differs, inspect:
+- tx raw ordering
+- message-to-sign construction
+- EDDSA signature and verification path
+- sender pubkey recovery assumptions
+3. Treat any round-trip or sender-address mismatch as blocking.
 
-## 4. Preserve cryptographic interface contracts
+## Reporting
 
-1. Keep Poseidon input contract explicit and validated.
-2. Keep EDDSA failure modes explicit for invalid key/range/signature inputs.
-3. Block changes that silently alter accepted input domains.
+Capture:
+- smoke script pass/fail
+- changed files under `src/tx/`, `src/crypto/`, `src/utils/`
+- intentional behavior changes and required migration note
 
-## 5. Validate and report
-
-1. Run `npm run build`.
-2. Report:
-- compatibility impact (`breaking`/`additive`/`internal`)
-- changed validation rules
-- pass/fail decision with required migration notes
+Use acceptance expectations in `references/acceptance-checks.md`.

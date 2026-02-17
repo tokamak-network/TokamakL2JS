@@ -1,5 +1,34 @@
 # Task Log
 
+## Task: Evolve all four upgrade guardrail skills into practical workflows
+
+### Plan
+- [x] Upgrade `l2-upgrade-public-api-guardrail` with executable API diff tooling and machine-readable reports.
+- [x] Upgrade `l2-upgrade-state-invariant-guardrail` with executable snapshot/invariant validation tooling.
+- [x] Upgrade `l2-upgrade-tx-crypto-guardrail` with deterministic tx/crypto smoke checks runnable in CI/local.
+- [x] Upgrade `l2-upgrade-release-readiness-guardrail` with an end-to-end release gate script.
+- [x] Update SKILL docs to reference concrete scripts, outputs, and pass/fail criteria.
+- [x] Run representative verification commands for all new scripts and record outcomes.
+- [x] Add review notes and outcomes.
+
+### Review
+- Upgraded all four skills from checklist text to executable workflows with concrete scripts and references.
+- Added executable resources:
+  - Public API: `scripts/check-public-api.mjs`, `references/severity-rules.md`
+  - State invariants: `scripts/check-state-manager-guards.sh`, `scripts/validate-state-snapshot.mjs`, `references/invariants.md`
+  - Tx/Crypto: `scripts/tx-crypto-smoke.mjs`, `references/acceptance-checks.md`
+  - Release readiness: `scripts/release-readiness-gate.sh`, `references/release-policy.md`
+- Updated each `SKILL.md` with quick-start commands, output artifacts, and explicit fail conditions.
+- Added `agents/skills/.gitignore` to ignore generated `out/` artifacts from guardrail runs.
+- Release gate robustness fix: switched `npm pack --dry-run` to use local cache under skill `out/.npm-cache` to avoid environment-specific `~/.npm` permission issues.
+- Validation runs:
+  - `node agents/skills/l2-upgrade-public-api-guardrail/scripts/check-public-api.mjs --base HEAD~1` passed.
+  - `bash agents/skills/l2-upgrade-state-invariant-guardrail/scripts/check-state-manager-guards.sh` passed.
+  - `node agents/skills/l2-upgrade-state-invariant-guardrail/scripts/validate-state-snapshot.mjs /tmp/tokamak-snapshot-valid.json` passed.
+  - `npm run build` passed.
+  - `node agents/skills/l2-upgrade-tx-crypto-guardrail/scripts/tx-crypto-smoke.mjs` passed.
+  - `bash agents/skills/l2-upgrade-release-readiness-guardrail/scripts/release-readiness-gate.sh HEAD~1` passed after cache-path fix.
+
 ## Task: Draft upgrade guardrail skills for TokamakL2JS
 
 ### Plan

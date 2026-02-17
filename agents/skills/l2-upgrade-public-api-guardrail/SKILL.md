@@ -5,46 +5,49 @@ description: Guard public API compatibility for TokamakL2JS upgrades. Use when c
 
 # Public API Guardrail
 
-Use this workflow to prevent accidental breaking changes in the published package.
+Run this skill whenever a change may affect downstream npm consumers.
 
-## 1. Scope the API impact
+## Quick Start
 
-1. List changed files with `git diff --name-only`.
-2. Mark any change in:
-`src/index.ts`, `src/tx/`, `src/stateManager/`, `src/crypto/`, `src/interface/`, `package.json`.
-3. Treat marked files as public-impact candidates unless proven internal-only.
+```bash
+node agents/skills/l2-upgrade-public-api-guardrail/scripts/check-public-api.mjs --base origin/main
+```
 
-## 2. Build an API delta table
+The script writes:
+- Markdown report: `agents/skills/l2-upgrade-public-api-guardrail/out/public-api-report.md`
+- JSON report: `agents/skills/l2-upgrade-public-api-guardrail/out/public-api-report.json`
 
-1. Compare old vs new exported identifiers from `src/index.ts`.
-2. Compare old vs new signatures for:
-`TokamakL2Tx`, `TokamakL2StateManager`, constructor helpers, config/snapshot types.
-3. Classify each delta:
-`breaking`, `additive`, or `internal`.
+It exits non-zero when a breaking delta is detected.
 
-Use `breaking` for:
-- removed/renamed export
-- required field addition in exported types
-- narrowed union/literal types
-- changed argument order/meaning
+## Workflow
 
-## 3. Enforce compatibility actions
+1. Run `check-public-api.mjs` with a base ref that represents the previous release point.
+2. Review `index.ts` export delta:
+- removed export => breaking
+- added export => additive
+3. Review `src/interface/configuration/types.ts` structural delta:
+- removed exported type => breaking
+- added required field => breaking
+- optional -> required => breaking
+4. If report contains breaking changes:
+- add compatibility alias/wrapper, or
+- confirm major-version release decision
+5. Run `npm run build` before closing the gate.
 
-1. If any `breaking` delta exists, require one:
-- compatibility wrapper/alias, or
-- explicit major-version decision
-2. If semver level does not match delta severity, block release.
+## Inputs
 
-## 4. Verify package surface
+- `--base <git-ref>`: comparison base (default: `HEAD~1`)
+- `--report <path>`: markdown output path
+- `--json <path>`: machine-readable output path
 
-1. Run `npm run build`.
-2. Run `npm pack --dry-run`.
-3. Confirm `package.json` `exports`, `main`, `types`, and `files` still align with generated `dist`.
+## Output Contract
 
-## 5. Report gate result
+JSON report schema:
+- `baseRef`: string
+- `headRef`: string
+- `breaking`: number
+- `additive`: number
+- `internal`: number
+- `details`: object arrays by category
 
-Publish a compact report with:
-- changed public symbols
-- severity per symbol (`breaking`/`additive`/`internal`)
-- required release version impact
-- pass/fail decision with blockers
+Use severity rules in `references/severity-rules.md`.
