@@ -85,11 +85,14 @@ try {
 const report = JSON.parse(readFileSync(reportPath, 'utf8'))
 const bump = bumpType(baseVersion, currentVersion)
 const breaking = Number(report.breaking || 0)
+const currentVersionText = currentVersion ? `${currentVersion.major}.${currentVersion.minor}.${currentVersion.patch}` : 'unknown'
+const expectedVersionCommit = `NPM version upgrade to ${currentVersionText}`
 
 console.log(`baseVersion=${baseVersion ? `${baseVersion.major}.${baseVersion.minor}.${baseVersion.patch}` : 'unknown'}`)
-console.log(`currentVersion=${currentVersion ? `${currentVersion.major}.${currentVersion.minor}.${currentVersion.patch}` : 'unknown'}`)
+console.log(`currentVersion=${currentVersionText}`)
 console.log(`bumpType=${bump}`)
 console.log(`breakingCount=${breaking}`)
+console.log(`requiredVersionCommitSubject=${expectedVersionCommit}`)
 
 if (breaking > 0 && bump !== 'major') {
   console.error('Breaking API changes require a major version bump.')
@@ -106,6 +109,20 @@ if (bump === 'same') {
 if (bump === 'invalid') {
   console.error('Cannot evaluate semver bump; check package.json versions.')
   process.exit(5)
+}
+if (bump === 'major' || bump === 'minor' || bump === 'patch') {
+  const range = `${baseRef}..HEAD`
+  const subjectsRaw = execSync(`git log --format=%s ${JSON.stringify(range)}`, { encoding: 'utf8' })
+  const subjects = subjectsRaw
+    .split('\\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const hasExpectedVersionCommit = subjects.includes(expectedVersionCommit)
+  console.log(`hasRequiredVersionCommitSubject=${hasExpectedVersionCommit}`)
+  if (!hasExpectedVersionCommit) {
+    console.error(`Version bumped but missing required commit subject: ${expectedVersionCommit}`)
+    process.exit(5)
+  }
 }
 NODE
 

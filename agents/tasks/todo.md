@@ -1,5 +1,21 @@
 # Task Log
 
+## Task: Enforce version-upgrade commit naming rule for publish
+
+### Plan
+- [x] Update release gate semver checks to require `NPM version upgrade to <version>` commit subject when `package.json` version is bumped.
+- [x] Update release skill docs/policy to describe the commit naming requirement.
+- [x] Run representative gate validation and record outcomes.
+- [x] Add review notes and outcomes.
+
+### Review
+- Added release-gate rule: when `package.json` version bump is detected (`major`/`minor`/`patch`), commit history in `baseRef..HEAD` must include exact subject:
+`NPM version upgrade to <current version>`.
+- Updated docs/policy to reflect the new publish blocker.
+- Validation runs:
+  - `bash agents/skills/upgrade-release-readiness-guardrail/scripts/release-readiness-gate.sh HEAD~1` -> fails as expected on unchanged version (`EXIT_CODE:5`).
+  - Semver check path with bumped-version scenario (base `d1a4400`, synthetic report `breaking=0`) -> fails as expected when required commit subject is missing (`EXIT_CODE:5`).
+
 ## Task: Enforce version bump in release-readiness gate
 
 ### Plan
