@@ -1,5 +1,23 @@
 # Task Log
 
+## Task: Draft upgrade guardrail skills for TokamakL2JS
+
+### Plan
+- [x] Define guardrail scope based on current public surface (`crypto`, `stateManager`, `tx`, config types, package exports).
+- [x] Create multiple draft skills under `agents/skills/` with strong trigger descriptions and upgrade-safe workflows.
+- [x] Ensure each draft skill includes concrete verification gates (API compatibility, state invariants, tx behavior, release checks).
+- [x] Review draft quality for clarity and minimal overlap.
+- [x] Add review notes and outcomes.
+
+### Review
+- Added four draft guardrail skills under `agents/skills/`:
+`l2-upgrade-public-api-guardrail`, `l2-upgrade-state-invariant-guardrail`,
+`l2-upgrade-tx-crypto-guardrail`, `l2-upgrade-release-readiness-guardrail`.
+- Each skill includes explicit trigger contexts in YAML `description` and a procedural gate workflow in the body.
+- Verification gates are embedded in the drafts (`npm run build`, `npm pack --dry-run`, invariant and compatibility reporting requirements).
+- Validation run: `npm run build` passed (`build:esm` + `build:cjs`).
+- `skill-creator` validator scripts could not run in this environment due missing dependency (`ModuleNotFoundError: No module named 'yaml'`).
+
 ## Task: Finish multi-tree support in captureStateSnapshot
 
 ### Plan
