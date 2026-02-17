@@ -12,8 +12,8 @@ import {
   storageKeysForAddress,
   TokamakL2StateManagerOpts,
 } from "../../stateManager/types.js";
-import { fromEdwardsToAddress, getUserStorageKey } from "../../utils/utils.js";
-import { deriveL2KeysFromSignature } from "../../utils/web.js";
+import { fromEdwardsToAddress, getUserStorageKey } from "../../utils/index.js";
+import { deriveL2KeysFromSignature } from "../wallet/index.js";
 import { ChannelStateConfig } from "./types.js";
 
 export function createStateManagerOptsFromChannelConfig(

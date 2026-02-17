@@ -2,7 +2,7 @@ import { jubjub } from "@noble/curves/misc.js";
 import { DST_NONCE } from "../interface/params/index.js";
 import { bigIntToBytes, bytesToBigInt, concatBytes, setLengthLeft } from "@ethereumjs/util";
 import { EdwardsPoint } from "@noble/curves/abstract/edwards.js";
-import { batchBigIntTo32BytesEach } from "../utils/utils.js";
+import { batchBigIntTo32BytesEach } from "../utils/index.js";
 import { poseidon2 } from "poseidon-bls12381"
 // TODO: Import this constant from QAP compiler in the future, when QAP compiler is NPM-packaged.
 import { POSEIDON_INPUTS } from "../interface/params/index.js";

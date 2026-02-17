@@ -1,8 +1,8 @@
 import { utf8ToBytes } from "ethereum-cryptography/utils";
-import { poseidon } from "../crypto/index.js";
+import { poseidon } from "../../crypto/index.js";
 import { jubjub } from "@noble/curves/misc.js";
 import { bigIntToBytes, bytesToBigInt, bytesToHex, setLengthLeft } from "@ethereumjs/util";
-import { fromEdwardsToAddress, getUserStorageKey } from "./utils.js";
+import { fromEdwardsToAddress, getUserStorageKey } from "../../utils/index.js";
 
 export const L2_PRV_KEY_MESSAGE='Tokamak-Private-App-Channel-'
 

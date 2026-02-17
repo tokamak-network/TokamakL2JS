@@ -4,7 +4,7 @@ import { EthereumJSErrorWithoutCode, RLP } from "@ethereumjs/rlp"
 import { jubjub } from "@noble/curves/misc.js"
 import { EdwardsPoint } from "@noble/curves/abstract/edwards.js"
 import { eddsaSign, eddsaVerify, getEddsaPublicKey, poseidon } from "../crypto/index.js"
-import { batchBigIntTo32BytesEach, fromEdwardsToAddress } from "../utils/utils.js"
+import { batchBigIntTo32BytesEach, fromEdwardsToAddress } from "../utils/index.js"
 import { createTokamakL2Tx } from "./constructors.js"
 
 // LegacyTx prohibits to add new members for extension. Bypassing this problem by the follow:

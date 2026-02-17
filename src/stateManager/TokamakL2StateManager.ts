@@ -7,7 +7,7 @@ import { ethers } from "ethers";
 import { RLP } from "@ethereumjs/rlp";
 import { MAX_MT_LEAVES, MT_DEPTH, POSEIDON_INPUTS } from "../interface/params/index.js";
 import { poseidon, poseidon_raw } from "../crypto/index.js";
-import { batchBigIntTo32BytesEach } from "../utils/utils.js";
+import { batchBigIntTo32BytesEach } from "../utils/index.js";
 import { StateSnapshot } from "../interface/stateSnapshot/types.js";
 import { treeNodeToBigint } from "./utils.js";
 
