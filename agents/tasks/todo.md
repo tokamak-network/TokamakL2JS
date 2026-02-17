@@ -1,5 +1,22 @@
 # Task Log
 
+## Task: Enforce version bump in release-readiness gate
+
+### Plan
+- [x] Update release gate semver rule to fail when `package.json` version is unchanged vs base ref.
+- [x] Update release skill documentation/policy to reflect strict version bump requirement for publish.
+- [x] Run release gate once to verify unchanged-version path fails as expected.
+- [x] Add review notes and outcomes.
+
+### Review
+- Added explicit `bump === 'same'` failure in `upgrade-release-readiness-guardrail` semver checks.
+- Updated release skill docs/policy to require version bump for publish attempts.
+- Fixed exit-code capture bug in release gate (`if ! cmd; then code=$?`) that could mask command failures; switched to `cmd || code=$?` for all gate steps.
+- Validation run:
+  - `bash agents/skills/upgrade-release-readiness-guardrail/scripts/release-readiness-gate.sh HEAD~1`
+  - result: failed as expected with `Version must be bumped for publish (same version as base ref).`
+  - exit code: `5`.
+
 ## Task: Reorganize guardrail skills into six-skill upgrade suite
 
 ### Plan

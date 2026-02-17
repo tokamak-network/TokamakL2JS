@@ -17,37 +17,25 @@ mkdir -p "${NPM_CACHE_DIR}"
 echo "[gate] base ref: ${BASE_REF}"
 
 api_exit=0
-if ! node agents/skills/upgrade-public-api-guardrail/scripts/check-public-api.mjs \
+node agents/skills/upgrade-public-api-guardrail/scripts/check-public-api.mjs \
   --base "${BASE_REF}" \
   --report "${PUBLIC_API_REPORT_MD}" \
-  --json "${PUBLIC_API_REPORT_JSON}"; then
-  api_exit=$?
-fi
+  --json "${PUBLIC_API_REPORT_JSON}" || api_exit=$?
 
 state_exit=0
-if ! bash agents/skills/upgrade-state-manager-guardrail/scripts/check-state-manager-guards.sh; then
-  state_exit=$?
-fi
+bash agents/skills/upgrade-state-manager-guardrail/scripts/check-state-manager-guards.sh || state_exit=$?
 
 build_exit=0
-if ! npm run build; then
-  build_exit=$?
-fi
+npm run build || build_exit=$?
 
 tx_exit=0
-if ! node agents/skills/upgrade-tx-guardrail/scripts/tx-smoke.mjs; then
-  tx_exit=$?
-fi
+node agents/skills/upgrade-tx-guardrail/scripts/tx-smoke.mjs || tx_exit=$?
 
 crypto_exit=0
-if ! node agents/skills/upgrade-crypto-guardrail/scripts/crypto-smoke.mjs; then
-  crypto_exit=$?
-fi
+node agents/skills/upgrade-crypto-guardrail/scripts/crypto-smoke.mjs || crypto_exit=$?
 
 pack_exit=0
-if ! npm pack --dry-run --cache "${NPM_CACHE_DIR}" > "${PACK_DRY_RUN_TXT}" 2>&1; then
-  pack_exit=$?
-fi
+npm pack --dry-run --cache "${NPM_CACHE_DIR}" > "${PACK_DRY_RUN_TXT}" 2>&1 || pack_exit=$?
 
 artifact_exit=0
 if [[ "${pack_exit}" -eq 0 ]]; then
@@ -60,7 +48,7 @@ if [[ "${pack_exit}" -eq 0 ]]; then
 fi
 
 semver_exit=0
-if ! node - "${BASE_REF}" "${PUBLIC_API_REPORT_JSON}" > "${OUT_DIR}/semver-check.txt" <<'NODE'
+node - "${BASE_REF}" "${PUBLIC_API_REPORT_JSON}" > "${OUT_DIR}/semver-check.txt" <<'NODE' || semver_exit=$?
 const { execSync } = require('node:child_process')
 const { readFileSync } = require('node:fs')
 
@@ -111,14 +99,15 @@ if (bump === 'decrease') {
   console.error('Version must not decrease from base ref.')
   process.exit(5)
 }
+if (bump === 'same') {
+  console.error('Version must be bumped for publish (same version as base ref).')
+  process.exit(5)
+}
 if (bump === 'invalid') {
   console.error('Cannot evaluate semver bump; check package.json versions.')
   process.exit(5)
 }
 NODE
-then
-  semver_exit=$?
-fi
 
 {
   echo "base_ref=${BASE_REF}"

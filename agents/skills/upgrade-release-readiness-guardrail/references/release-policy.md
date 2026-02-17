@@ -12,6 +12,7 @@
 
 - Breaking API deltas require major version bump.
 - Additive-only deltas can use minor/patch based on release policy.
+- Publish attempts must bump `package.json` version vs base ref.
 - Version decreases are invalid.
 
 ## Publish Blockers

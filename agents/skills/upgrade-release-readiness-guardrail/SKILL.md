@@ -40,6 +40,7 @@ This command runs:
 ## Fail Conditions
 
 - public API breaking changes without major version bump
+- no version bump in `package.json` compared to base ref
 - missing built entry files from pack output
 - failing state/tx/crypto gates
 - failing build or dry-run package step
