@@ -1,0 +1,55 @@
+# TokamakL2JS (Full LLM Context)
+
+TokamakL2JS is a TypeScript/JavaScript library for Tokamak Network Layer-2 ZKP-oriented workflows. It extends EthereumJS patterns with ZKP-friendly cryptographic and state-management behavior.
+
+## High-Level Purpose
+
+- Build and sign Tokamak L2 transactions.
+- Use Poseidon and EDDSA-related helpers for L2 workflows.
+- Build/read L2-compatible state snapshots and state-manager structures.
+- Expose cohesive public APIs from `src/index.ts`.
+
+## Installation
+
+```bash
+npm install tokamak-l2js
+```
+
+## Public API Stability
+
+Consumers should import from package root (`tokamak-l2js`). The canonical export map is maintained in:
+
+- `src/index.ts`
+
+Module-level exports are organized in:
+
+- `src/crypto/index.ts`
+- `src/tx/index.ts`
+- `src/block/index.ts`
+- `src/stateManager/index.ts`
+- `src/interface/**`
+
+## Practical Examples
+
+- Transaction creation/signing flow:
+  - `examples/transaction/create-tx.ts`
+  - `examples/transaction/config.json`
+- State manager creation from RPC:
+  - `examples/stateManager/fromRPC/create-state-manager.ts`
+  - `examples/stateManager/fromRPC/config.json`
+
+## Maintenance and Governance
+
+- Contributing process: `CONTRIBUTING.md`
+- Security reporting: `SECURITY.md`
+- User support: `SUPPORT.md`
+- Behavioral expectations: `CODE_OF_CONDUCT.md`
+- Citation metadata: `CITATION.cff`
+
+## Suggested Retrieval Priority for AI Tools
+
+1. `README.md` for user-facing overview and commands.
+2. `src/index.ts` for normative public API surface.
+3. The target module file under `src/**` for implementation behavior.
+4. `examples/**` for usage patterns.
+5. Governance/policy files for contribution/security/support context.

@@ -211,3 +211,25 @@
 - Root cause identified: leaf reconstruction used `registeredKeysForAddress[index]` (object index access) instead of `registeredKeysForAddress.keys[index]`, causing keys to resolve as `undefined` and leaf hashing to collapse to zero-filled inputs.
 - Fixed snapshot validation logic from `every(mismatch)` to `some(mismatch)`, so initialization fails when any reconstructed root diverges from snapshot roots.
 - Validation run: `npm run build` passed (`build:esm` + `build:cjs`).
+
+## Task: Apply SEO and GEO improvements for repository discoverability
+
+### Plan
+- [x] Upgrade `README.md` with search-friendly structure, corrected example paths, and explicit API/use-case keywords.
+- [x] Expand `package.json` metadata (`description` and `keywords`) for repository/package indexing.
+- [x] Add community/discovery docs used by GitHub and search systems: `CONTRIBUTING.md`, `SECURITY.md`, `SUPPORT.md`, `CODE_OF_CONDUCT.md`.
+- [x] Add machine-readable attribution/discovery docs: `CITATION.cff`, `llms.txt`, `llms-full.txt`.
+- [x] Run build verification and record outcomes in review notes.
+
+### Review
+- Rewrote `README.md` for discoverability with clear product positioning, installation/usage sections, corrected example paths, API module links, and explicit keyword coverage.
+- Expanded npm metadata in `package.json` with a more descriptive summary and broader L2/ZKP search keywords.
+- Added GitHub community-health/discovery documents:
+  - `CONTRIBUTING.md`
+  - `SECURITY.md`
+  - `SUPPORT.md`
+  - `CODE_OF_CONDUCT.md`
+- Added machine-readable discovery files:
+  - `CITATION.cff` for citation indexing
+  - `llms.txt` and `llms-full.txt` for AI retrieval/grounding context
+- Validation run: `npm run build` passed (`build:esm` + `build:cjs`).

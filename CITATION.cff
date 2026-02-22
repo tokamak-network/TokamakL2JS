@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+title: TokamakL2JS
+message: "If you use TokamakL2JS in research, documentation, or production references, please cite this software."
+type: software
+authors:
+  - name: Tokamak Network
+license: MIT OR Apache-2.0
+repository-code: "https://github.com/tokamak-network/TokamakL2JS"
+url: "https://github.com/tokamak-network/TokamakL2JS"

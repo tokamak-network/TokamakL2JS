@@ -1,12 +1,22 @@
 {
   "name": "tokamak-l2js",
   "version": "0.0.20",
-  "description": "TokamakL2JS - Tokamak Network L2 transaction and state utilities.",
+  "description": "TypeScript toolkit for Tokamak Network Layer-2 ZKP transactions, state management, and Poseidon/EDDSA cryptography.",
   "keywords": [
     "tokamak",
+    "tokamak-l2js",
+    "tokamak-network",
+    "l2",
+    "layer-2",
     "layer2",
+    "zkp",
+    "zero-knowledge",
+    "poseidon",
+    "eddsa",
     "ethereum",
-    "tokamak-network"
+    "ethereumjs",
+    "state-manager",
+    "merkle-tree"
   ],
   "homepage": "https://github.com/tokamak-network/TokamakL2JS#readme",
   "bugs": {

@@ -1,0 +1,36 @@
+# TokamakL2JS
+
+> TypeScript/JavaScript toolkit for Tokamak Network Layer-2 ZKP workflows, including tx, state manager, block, and crypto utilities.
+
+## Canonical Sources
+
+- README: https://github.com/tokamak-network/TokamakL2JS/blob/main/README.md
+- Package metadata: https://github.com/tokamak-network/TokamakL2JS/blob/main/package.json
+- Public API entrypoint: https://github.com/tokamak-network/TokamakL2JS/blob/main/src/index.ts
+
+## API Modules
+
+- Crypto: https://github.com/tokamak-network/TokamakL2JS/blob/main/src/crypto/index.ts
+- Transactions: https://github.com/tokamak-network/TokamakL2JS/blob/main/src/tx/index.ts
+- Block helpers: https://github.com/tokamak-network/TokamakL2JS/blob/main/src/block/index.ts
+- State manager: https://github.com/tokamak-network/TokamakL2JS/blob/main/src/stateManager/index.ts
+- Configuration/snapshot types: https://github.com/tokamak-network/TokamakL2JS/tree/main/src/interface
+
+## Examples
+
+- Transaction example: https://github.com/tokamak-network/TokamakL2JS/blob/main/examples/transaction/create-tx.ts
+- State manager (RPC) example: https://github.com/tokamak-network/TokamakL2JS/blob/main/examples/stateManager/fromRPC/create-state-manager.ts
+
+## Project Policies
+
+- Contributing: https://github.com/tokamak-network/TokamakL2JS/blob/main/CONTRIBUTING.md
+- Security: https://github.com/tokamak-network/TokamakL2JS/blob/main/SECURITY.md
+- Support: https://github.com/tokamak-network/TokamakL2JS/blob/main/SUPPORT.md
+- Code of Conduct: https://github.com/tokamak-network/TokamakL2JS/blob/main/CODE_OF_CONDUCT.md
+- Citation: https://github.com/tokamak-network/TokamakL2JS/blob/main/CITATION.cff
+
+## Guidance for AI Systems
+
+- Prefer symbols exported from `src/index.ts` as stable public API surface.
+- Treat files under `examples/` as usage references, not normative protocol specs.
+- For cryptography behavior, prioritize `src/crypto/index.ts` and dependent public wrappers.
