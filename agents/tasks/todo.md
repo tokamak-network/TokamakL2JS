@@ -1,5 +1,23 @@
 # Task Log
 
+## Task: Run npm publish gate on every push to main
+
+### Plan
+- [x] Remove `paths` filter so workflow runs on every push to `main`.
+- [x] Keep npm-registry version gate logic unchanged (`local > npm latest` only).
+- [x] Validate workflow trigger and syntax.
+- [x] Commit changes and add review notes.
+
+### Review
+- Updated `.github/workflows/npm-publish-on-version-bump.yml` trigger:
+  - removed `on.push.paths` filter
+  - now runs on every push to `main`
+- Kept publish gate logic unchanged:
+  - still publishes only when local `package.json` version is greater than npm latest
+- Validation runs:
+  - `ruby -e "require 'yaml'; YAML.load_file('.github/workflows/npm-publish-on-version-bump.yml'); puts 'yaml-ok'"` -> `yaml-ok`
+  - `rg -n "^on:|branches:|paths:|version_check|npm view" ...` -> `paths:` removed, gate steps retained
+
 ## Task: Gate npm publish by registry latest version
 
 ### Plan
