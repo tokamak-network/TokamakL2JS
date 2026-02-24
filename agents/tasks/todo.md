@@ -1,5 +1,28 @@
 # Task Log
 
+## Task: Gate npm publish by registry latest version
+
+### Plan
+- [x] Replace publish gate logic to compare local `package.json` version against npm registry latest version.
+- [x] Keep Trusted Publishing (OIDC) configuration intact while updating only the gate criteria.
+- [x] Validate workflow syntax and gate conditions with representative semver cases.
+- [x] Commit and push changes, then add review notes.
+
+### Review
+- Updated `.github/workflows/npm-publish-on-version-bump.yml` gate logic:
+  - compares `package.json` local version vs `npm view <package> version`
+  - publishes only when local version is strictly higher than npm latest
+  - handles first publish (`404`) by allowing publish
+  - keeps OIDC requirements (`id-token: write`) and no `NODE_AUTH_TOKEN`
+- Validation runs:
+  - `ruby -e "require 'yaml'; YAML.load_file('.github/workflows/npm-publish-on-version-bump.yml'); puts 'yaml-ok'"` -> `yaml-ok`
+  - `rg -n "id-token: write|NODE_AUTH_TOKEN|Detect version increase vs npm registry|npm view|node-version" ...` -> confirms expected settings
+  - semver logic samples validated:
+    - `0.0.19 -> 0.0.20` publish
+    - `0.0.20 -> 0.0.20` skip
+    - `0.1.0 -> 0.0.21` skip
+    - prerelease ordering cases behaved as expected
+
 ## Task: Switch npm publish workflow to Trusted Publishing (OIDC)
 
 ### Plan

@@ -18,66 +18,109 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 1
 
-      - name: Detect version increase
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Detect version increase vs npm registry
         id: version_check
         shell: bash
         run: |
           set -euo pipefail
 
+          PACKAGE_NAME="$(node -p "require('./package.json').name")"
           CURRENT_VERSION="$(node -p "require('./package.json').version")"
-          BEFORE_SHA="${{ github.event.before }}"
+          ERR_LOG="$(mktemp)"
+          trap 'rm -f "${ERR_LOG}"' EXIT
 
-          if [[ -z "${BEFORE_SHA}" || "${BEFORE_SHA}" == "0000000000000000000000000000000000000000" ]]; then
+          if npm view "${PACKAGE_NAME}" version --json >"${ERR_LOG}" 2>&1; then
+            NPM_LATEST="$(node -e "const raw=require('fs').readFileSync(process.argv[1],'utf8').trim(); const parsed=JSON.parse(raw); console.log(Array.isArray(parsed) ? parsed.at(-1) : parsed);" "${ERR_LOG}")"
+          else
+            if grep -qiE 'E404|Not Found|404' "${ERR_LOG}"; then
+              echo "publish=true" >> "$GITHUB_OUTPUT"
+              echo "reason=Package not found on npm; first publish allowed (${CURRENT_VERSION})." >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
             echo "publish=false" >> "$GITHUB_OUTPUT"
-            echo "reason=No previous commit SHA available." >> "$GITHUB_OUTPUT"
+            echo "reason=Failed to query npm latest version for ${PACKAGE_NAME}." >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          PREV_VERSION="$(git show "${BEFORE_SHA}:package.json" 2>/dev/null | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{console.log(JSON.parse(d).version)}catch{process.exit(1)}})")" || true
-
-          if [[ -z "${PREV_VERSION:-}" ]]; then
+          if [[ -z "${NPM_LATEST:-}" ]]; then
             echo "publish=false" >> "$GITHUB_OUTPUT"
-            echo "reason=Could not read previous package.json version." >> "$GITHUB_OUTPUT"
+            echo "reason=Could not parse npm latest version for ${PACKAGE_NAME}." >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          if node - "${PREV_VERSION}" "${CURRENT_VERSION}" <<'NODE'
-          const [prev, curr] = process.argv.slice(2);
-          const normalize = (v) => v.split("-")[0].split(".").map(Number);
-          const [pMaj, pMin, pPatch] = normalize(prev);
-          const [cMaj, cMin, cPatch] = normalize(curr);
-          const numbers = [pMaj, pMin, pPatch, cMaj, cMin, cPatch];
+          if node - "${NPM_LATEST}" "${CURRENT_VERSION}" <<'NODE'
+          const [published, local] = process.argv.slice(2);
+          const parse = (value) => {
+            const match = value.trim().match(/^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z.-]+))?(?:\+.*)?$/);
+            if (!match) return null;
+            const pre = match[4]
+              ? match[4].split(".").map((token) => (/^\d+$/.test(token) ? Number(token) : token))
+              : [];
+            return {
+              major: Number(match[1]),
+              minor: Number(match[2]),
+              patch: Number(match[3]),
+              pre
+            };
+          };
 
-          if (!numbers.every(Number.isFinite)) {
+          const comparePre = (a, b) => {
+            for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
+              const left = a[i];
+              const right = b[i];
+
+              if (left === undefined) return -1;
+              if (right === undefined) return 1;
+              if (left === right) continue;
+
+              const leftIsNum = typeof left === "number";
+              const rightIsNum = typeof right === "number";
+              if (leftIsNum && rightIsNum) return left > right ? 1 : -1;
+              if (leftIsNum) return -1;
+              if (rightIsNum) return 1;
+              return left > right ? 1 : -1;
+            }
+            return 0;
+          };
+
+          const compare = (a, b) => {
+            for (const key of ["major", "minor", "patch"]) {
+              if (a[key] !== b[key]) return a[key] > b[key] ? 1 : -1;
+            }
+
+            if (a.pre.length === 0 && b.pre.length === 0) return 0;
+            if (a.pre.length === 0) return 1;
+            if (b.pre.length === 0) return -1;
+            return comparePre(a.pre, b.pre);
+          };
+
+          const publishedVer = parse(published);
+          const localVer = parse(local);
+          if (!publishedVer || !localVer) {
             process.exit(2);
           }
 
-          const increased =
-            cMaj > pMaj ||
-            (cMaj === pMaj && cMin > pMin) ||
-            (cMaj === pMaj && cMin === pMin && cPatch > pPatch);
-
-          process.exit(increased ? 0 : 1);
+          process.exit(compare(localVer, publishedVer) > 0 ? 0 : 1);
           NODE
           then
             echo "publish=true" >> "$GITHUB_OUTPUT"
-            echo "reason=Version increased (${PREV_VERSION} -> ${CURRENT_VERSION})." >> "$GITHUB_OUTPUT"
+            echo "reason=Version increased vs npm (${NPM_LATEST} -> ${CURRENT_VERSION})." >> "$GITHUB_OUTPUT"
           else
             echo "publish=false" >> "$GITHUB_OUTPUT"
-            echo "reason=Version not increased (${PREV_VERSION} -> ${CURRENT_VERSION})." >> "$GITHUB_OUTPUT"
+            echo "reason=Version not higher than npm latest (${NPM_LATEST} -> ${CURRENT_VERSION})." >> "$GITHUB_OUTPUT"
           fi
 
       - name: Show decision
         run: echo "${{ steps.version_check.outputs.reason }}"
-
-      - name: Set up Node.js
-        if: steps.version_check.outputs.publish == 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
         if: steps.version_check.outputs.publish == 'true'
