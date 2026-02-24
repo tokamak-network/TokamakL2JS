@@ -1,5 +1,24 @@
 # Task Log
 
+## Task: Automate npm publish on version bump in main
+
+### Plan
+- [x] Add GitHub Actions workflow that triggers on `push` to `main` (including merged PRs) and only when `package.json` changes.
+- [x] Gate publish by detecting `package.json` version increase versus previous commit.
+- [x] Run `npm ci` and publish with `NODE_AUTH_TOKEN` secret only when the gate passes.
+- [x] Validate workflow syntax/logic and add review notes.
+
+### Review
+- Added `.github/workflows/npm-publish-on-version-bump.yml`:
+  - trigger: `push` on `main` with `paths: [package.json]`
+  - guard: compare `github.event.before:package.json` version vs current version
+  - publish only when semver strictly increases
+  - publish command uses `NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}`
+- Validation runs:
+  - `ruby -e "require 'yaml'; YAML.load_file('.github/workflows/npm-publish-on-version-bump.yml'); puts 'yaml-ok'"` -> `yaml-ok`
+  - local guard logic run with `HEAD~1` vs `HEAD` -> `publish=false` for unchanged version (`0.0.20 -> 0.0.20`)
+  - synthetic semver checks -> `0.0.19 -> 0.0.20` publish / equal or downgrade skip
+
 ## Task: Enforce remote-main synchronization before publish
 
 ### Plan

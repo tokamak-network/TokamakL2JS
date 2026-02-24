@@ -1,0 +1,90 @@
+name: Publish npm on version bump
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - package.json
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect version increase
+        id: version_check
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          CURRENT_VERSION="$(node -p "require('./package.json').version")"
+          BEFORE_SHA="${{ github.event.before }}"
+
+          if [[ -z "${BEFORE_SHA}" || "${BEFORE_SHA}" == "0000000000000000000000000000000000000000" ]]; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "reason=No previous commit SHA available." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          PREV_VERSION="$(git show "${BEFORE_SHA}:package.json" 2>/dev/null | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{console.log(JSON.parse(d).version)}catch{process.exit(1)}})")" || true
+
+          if [[ -z "${PREV_VERSION:-}" ]]; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "reason=Could not read previous package.json version." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if node - "${PREV_VERSION}" "${CURRENT_VERSION}" <<'NODE'
+          const [prev, curr] = process.argv.slice(2);
+          const normalize = (v) => v.split("-")[0].split(".").map(Number);
+          const [pMaj, pMin, pPatch] = normalize(prev);
+          const [cMaj, cMin, cPatch] = normalize(curr);
+          const numbers = [pMaj, pMin, pPatch, cMaj, cMin, cPatch];
+
+          if (!numbers.every(Number.isFinite)) {
+            process.exit(2);
+          }
+
+          const increased =
+            cMaj > pMaj ||
+            (cMaj === pMaj && cMin > pMin) ||
+            (cMaj === pMaj && cMin === pMin && cPatch > pPatch);
+
+          process.exit(increased ? 0 : 1);
+          NODE
+          then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "reason=Version increased (${PREV_VERSION} -> ${CURRENT_VERSION})." >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "reason=Version not increased (${PREV_VERSION} -> ${CURRENT_VERSION})." >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Show decision
+        run: echo "${{ steps.version_check.outputs.reason }}"
+
+      - name: Set up Node.js
+        if: steps.version_check.outputs.publish == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        if: steps.version_check.outputs.publish == 'true'
+        run: npm ci
+
+      - name: Publish to npm
+        if: steps.version_check.outputs.publish == 'true'
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
