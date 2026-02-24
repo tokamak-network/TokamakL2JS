@@ -1,5 +1,22 @@
 # Task Log
 
+## Task: Switch npm publish workflow to Trusted Publishing (OIDC)
+
+### Plan
+- [x] Update GitHub Actions publish workflow to use Trusted Publishing without `NPM_TOKEN`.
+- [x] Align runtime with npm Trusted Publishing requirements (`Node >= 22.14.0`).
+- [x] Validate workflow syntax and key OIDC conditions (`id-token: write`, no publish token env).
+- [x] Commit and push workflow changes, then document review notes.
+
+### Review
+- Updated `.github/workflows/npm-publish-on-version-bump.yml` for Trusted Publishing:
+  - `actions/setup-node` runtime changed to `node-version: "24"` (satisfies `>=22.14.0`).
+  - Removed `NODE_AUTH_TOKEN` usage from `npm publish` step.
+  - Kept `permissions.id-token: write` for OIDC token exchange.
+- Validation runs:
+  - `ruby -e "require 'yaml'; YAML.load_file('.github/workflows/npm-publish-on-version-bump.yml'); puts 'yaml-ok'"` -> `yaml-ok`
+  - `rg -n "id-token: write|NODE_AUTH_TOKEN|node-version" .github/workflows/npm-publish-on-version-bump.yml` -> confirms `id-token: write`, `node-version: "24"`, and no `NODE_AUTH_TOKEN`.
+
 ## Task: Automate npm publish on version bump in main
 
 ### Plan
