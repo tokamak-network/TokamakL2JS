@@ -1,4 +1,4 @@
-// Usage: npm run build && node --experimental-strip-types examples/stateManager/fromStateSnapshot/create-state-manager.ts <config.json> <snapshot.json>
+// Usage: tsx examples/stateManager/fromStateSnapshot/create-state-manager.ts <config.json> <snapshot.json>
 
 import { promises as fs } from 'fs';
 import { Common, Mainnet, Sepolia } from '@ethereumjs/common';
@@ -7,7 +7,7 @@ import {
   createTokamakL2StateManagerFromStateSnapshot,
   getEddsaPublicKey,
   poseidon,
-} from '../../../dist/index.js';
+} from '../../../src/index.ts';
 
 type ExampleSnapshotConfig = {
   network: 'mainnet' | 'sepolia';
@@ -41,7 +41,7 @@ const main = async () => {
   const snapshotPath = process.argv[3];
   if (!configPath || !snapshotPath) {
     throw new Error(
-      'Config and snapshot file paths are required. Usage: node --experimental-strip-types examples/stateManager/fromStateSnapshot/create-state-manager.ts <config.json> <snapshot.json>'
+      'Config and snapshot file paths are required. Usage: tsx examples/stateManager/fromStateSnapshot/create-state-manager.ts <config.json> <snapshot.json>'
     );
   }
 
