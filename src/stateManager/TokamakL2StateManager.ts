@@ -162,35 +162,8 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         return leaves
     }
 
-    private _getTrackedStorageAddresses(): Address[] {
-        if (this._registeredKeys === null) {
-            throw new Error('Registered storage keys are not initialized.')
-        }
-        return this._registeredKeys.map((entry) => entry.address);
-    }
-
-    private async _mergeRegisteredKeysWithStateManagerKeys() {
-        const addresses = this._getTrackedStorageAddresses();
-        for (const [idx, address] of addresses.entries()) {
-            const registeredKeysForAddress = this._registeredKeys[idx];
-            const registeredKeySet = new Set<bigint>(
-                registeredKeysForAddress.keys.map((key) => bytesToBigInt(key))
-            );
-            const storageDump = await this.dumpStorage(address);
-            for (const dumpedKey of Object.keys(storageDump)) {
-                const keyBytes = hexToBytes(addHexPrefix(dumpedKey));
-                const keyBigInt = bytesToBigInt(keyBytes);
-                if (!registeredKeySet.has(keyBigInt)) {
-                    registeredKeysForAddress.keys.push(keyBytes);
-                    registeredKeySet.add(keyBigInt);
-                }
-            }
-        }
-    }
-
     public async getUpdatedMerkleTree(): Promise<TokamakL2MerkleTrees> {
         await this.flush();
-        await this._mergeRegisteredKeysWithStateManagerKeys();
         return TokamakL2MerkleTrees.buildFromTokamakL2StateManager(this)
     }
 

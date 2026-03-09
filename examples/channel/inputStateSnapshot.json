@@ -1,0 +1,22 @@
+{
+  "channelId": 1,
+  "stateRoots": [
+    "0x1438216d4d9fbc223e9c033fe68b660088fcee2448dbc6d5790161ddedbd1d09"
+  ],
+  "storageAddresses": [
+    "0x2be5e8c109e2197D077D13A82dAead6a9b3433C5"
+  ],
+  "registeredKeys": [
+    [
+      {
+        "key": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "value": "0x64"
+      },
+      {
+        "key": "0x0000000000000000000000000000000000000000000000000000000000000002",
+        "value": "0x0a"
+      }
+    ]
+  ],
+  "entryContractAddress": "0x2be5e8c109e2197D077D13A82dAead6a9b3433C5"
+}
