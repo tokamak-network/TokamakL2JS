@@ -15,6 +15,17 @@
     {
       "type": "node",
       "request": "launch",
+      "name": "Create a TokamakL2StateManager from StateSnapshot",
+      "runtimeExecutable": "tsx",
+      "program": "${workspaceFolder}/examples/stateManager/fromStateSnapshot/create-state-manager.ts",
+      "args": ["${workspaceFolder}/examples/stateManager/fromStateSnapshot/snapshot.json"],
+      "cwd": "${workspaceFolder}",
+      "skipFiles": ["<node_internals>/**"],
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "node",
+      "request": "launch",
       "name": "Create a TokamakL2Tx",
       "runtimeExecutable": "tsx",
       "program": "${workspaceFolder}/examples/transaction/create-tx.ts",
