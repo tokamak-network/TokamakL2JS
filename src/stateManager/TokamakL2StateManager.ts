@@ -13,21 +13,30 @@ import { treeNodeToBigint } from "./utils.js";
 
 
 
+type TrackedStorageKeysForAddress = {
+    address: Address
+    keys: Map<bigint, `0x${string}`>
+}
+
 export class TokamakL2StateManager extends MerkleStateManager implements StateManagerInterface {
     private _cachedOpts: TokamakL2StateManagerOpts | null = null
     private _registeredKeys: RegisteredKeysForAddress[] | null = null
-    private _trackedStorageKeys: Map<string, Map<string, Uint8Array>> = new Map()
+    private _trackedStorageKeys: Map<bigint, TrackedStorageKeysForAddress> = new Map()
 
     private trackStorageKey(address: Address, key: Uint8Array): void {
-        const addressKey = address.toString().toLowerCase()
-        let trackedKeys = this._trackedStorageKeys.get(addressKey)
-        if (trackedKeys === undefined) {
-            trackedKeys = new Map()
-            this._trackedStorageKeys.set(addressKey, trackedKeys)
+        const addressBigInt = bytesToBigInt(address.bytes)
+        let trackedKeysForAddress = this._trackedStorageKeys.get(addressBigInt)
+        if (trackedKeysForAddress === undefined) {
+            trackedKeysForAddress = {
+                address,
+                keys: new Map(),
+            }
+            this._trackedStorageKeys.set(addressBigInt, trackedKeysForAddress)
         }
-        const keyHex = bytesToHex(key).toLowerCase()
-        if (!trackedKeys.has(keyHex)) {
-            trackedKeys.set(keyHex, Uint8Array.from(key))
+        const keyHex = addHexPrefix(bytesToHex(key)) as `0x${string}`
+        const keyBigInt = hexToBigInt(keyHex)
+        if (!trackedKeysForAddress.keys.has(keyBigInt)) {
+            trackedKeysForAddress.keys.set(keyBigInt, keyHex)
         }
     }
 
@@ -36,30 +45,30 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             throw new Error('Registered storage keys are not initialized.')
         }
 
-        const registeredByAddress = new Map<string, RegisteredKeysForAddress>(
-            this._registeredKeys.map((entry) => [entry.address.toString().toLowerCase(), entry])
+        const registeredByAddress = new Map<bigint, RegisteredKeysForAddress>(
+            this._registeredKeys.map((entry) => [bytesToBigInt(entry.address.bytes), entry])
         )
 
-        for (const [addressKey, trackedKeys] of this._trackedStorageKeys.entries()) {
-            let registeredKeysForAddress = registeredByAddress.get(addressKey)
+        for (const [addressBigInt, trackedKeysForAddress] of this._trackedStorageKeys.entries()) {
+            let registeredKeysForAddress = registeredByAddress.get(addressBigInt)
             if (registeredKeysForAddress === undefined) {
                 registeredKeysForAddress = {
-                    address: createAddressFromString(addressKey),
+                    address: trackedKeysForAddress.address,
                     keys: [],
                 }
                 this._registeredKeys.push(registeredKeysForAddress)
-                registeredByAddress.set(addressKey, registeredKeysForAddress)
+                registeredByAddress.set(addressBigInt, registeredKeysForAddress)
             }
 
-            const knownKeys = new Set(
-                registeredKeysForAddress.keys.map((entry) => bytesToHex(entry).toLowerCase())
+            const knownKeys = new Set<bigint>(
+                registeredKeysForAddress.keys.map((entry) => bytesToBigInt(entry))
             )
-            for (const [keyHex, keyBytes] of trackedKeys.entries()) {
-                if (knownKeys.has(keyHex)) {
+            for (const [keyBigInt, keyHex] of trackedKeysForAddress.keys.entries()) {
+                if (knownKeys.has(keyBigInt)) {
                     continue
                 }
-                registeredKeysForAddress.keys.push(Uint8Array.from(keyBytes))
-                knownKeys.add(keyHex)
+                registeredKeysForAddress.keys.push(hexToBytes(addHexPrefix(keyHex)))
+                knownKeys.add(keyBigInt)
             }
         }
     }
