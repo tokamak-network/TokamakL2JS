@@ -2,9 +2,9 @@
   "network": "mainnet",
   "senderSeed": "Sender's L2 wallet",
   "recipientSeed": "Recepient's L2 wallet",
+  "userStorageSlot": 0,
   "txNonce": 0,
   "contractAddress": "0x2be5e8c109e2197D077D13A82dAead6a9b3433C5",
-  "contractCode": "0x60243580600154036001556002540160025500",
   "transferSelector": "0xa9059cbb",
   "amount": "0x0a"
 }
