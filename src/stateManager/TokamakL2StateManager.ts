@@ -121,24 +121,11 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         if (snapshot.storageAddresses.length !== snapshot.registeredKeys.length) {
             throw new Error('Snapshot is expected to have a set of register keys for each storage address')
         }
-        if (snapshot.storageAddresses.length !== snapshot.preAllocatedLeaves.length) {
-            throw new Error('Snapshot is expected to have a set of pre-allocated leaves for each storage address')
-        }
-        if (snapshot.storageAddresses.length !== snapshot.storageEntries.length) {
-            throw new Error('Snapshot is expected to have a set of storage entries for each storage address')
-        }
         this._registeredKeys = [];
         for (const [idx, addressStr] of snapshot.storageAddresses.entries()) {
             const address = createAddressFromString(addressStr);
-            const registeredKeysForAddress = snapshot.registeredKeys[idx].map(str => hexToBytes(addHexPrefix(str)));
-            const unorderedRegisteredKeys = [...snapshot.preAllocatedLeaves[idx], ...snapshot.storageEntries[idx]];
-            if (registeredKeysForAddress.length !== unorderedRegisteredKeys.length) {
-                    throw new Error('The registered keys in the snapshot mismatch with the pre-allocated keys and the storage keys')
-                }
-            for (const entry of unorderedRegisteredKeys) {
-                if (registeredKeysForAddress.findIndex(byteKey => bytesToBigInt(byteKey) === hexToBigInt(addHexPrefix(entry.key))) < 0 ) {
-                    throw new Error('The registered keys in the snapshot mismatch with the pre-allocated keys and the storage keys')
-                }
+            const registeredKeysForAddress = snapshot.registeredKeys[idx].map((entry) => hexToBytes(addHexPrefix(entry.key)));
+            for (const entry of snapshot.registeredKeys[idx]) {
                 const vBytes = hexToBytes(addHexPrefix(entry.value));
                 const keyBytes = hexToBytes(addHexPrefix(entry.key));
                 await this.putStorage(address, keyBytes, vBytes);
@@ -232,21 +219,11 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         if (prevSnapshot.storageAddresses.length !== prevSnapshot.registeredKeys.length) {
             throw new Error('Snapshot is expected to have a set of register keys for each storage address')
         }
-        if (prevSnapshot.storageAddresses.length !== prevSnapshot.preAllocatedLeaves.length) {
-            throw new Error('Snapshot is expected to have a set of pre-allocated leaves for each storage address')
-        }
-        if (prevSnapshot.storageAddresses.length !== prevSnapshot.storageEntries.length) {
-            throw new Error('Snapshot is expected to have a set of storage entries for each storage address')
-        }
         await this.flush();
-        const getUpdatedEntry = async (
-            address: Address,
-            entry: {key: string; value: string;}
-        ): Promise<{key: string; value: string;}> => {
-            const keyBytes = hexToBytes(addHexPrefix(entry.key));
+        const getUpdatedEntry = async (address: Address, keyBytes: Uint8Array): Promise<{key: string; value: string;}> => {
             const value = await this.getStorage(address, keyBytes);
             return {
-                key: entry.key,
+                key: bytesToHex(keyBytes),
                 value: bytesToHex(value),
             }
         }
@@ -263,12 +240,10 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             );
         }
 
-        const registeredKeys: string[][] = [];
-        const storageEntries: { key: string; value: string }[][] = [];
-        const preAllocatedLeaves: { key: string; value: string }[][] = [];
+        const registeredKeys: { key: string; value: string }[][] = [];
         const stateRoots: string[] = [];
 
-        for (const [idx, addressStr] of prevSnapshot.storageAddresses.entries()) {
+        for (const addressStr of prevSnapshot.storageAddresses) {
             const address = createAddressFromString(addressStr);
             const addressKey = address.toString().toLowerCase();
             const currentRegisteredKeys = registeredKeysByAddress.get(addressKey);
@@ -278,12 +253,8 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
                 throw new Error(`Cannot capture snapshot for unregistered storage address: ${addressStr}`)
             }
 
-            registeredKeys.push(currentRegisteredKeys.map((key) => bytesToHex(key)));
-            storageEntries.push(
-                await Promise.all(prevSnapshot.storageEntries[idx].map((entry) => getUpdatedEntry(address, entry)))
-            );
-            preAllocatedLeaves.push(
-                await Promise.all(prevSnapshot.preAllocatedLeaves[idx].map((entry) => getUpdatedEntry(address, entry)))
+            registeredKeys.push(
+                await Promise.all(currentRegisteredKeys.map((key) => getUpdatedEntry(address, key)))
             );
             stateRoots.push(currentRoot);
         }
@@ -293,8 +264,6 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             stateRoots,
             storageAddresses: [...prevSnapshot.storageAddresses],
             registeredKeys,
-            storageEntries,
-            preAllocatedLeaves,
             entryContractAddress: prevSnapshot.entryContractAddress,
         };
     }
