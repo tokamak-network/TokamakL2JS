@@ -207,16 +207,6 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         return TokamakL2MerkleTrees.buildFromTokamakL2StateManager(this)
     }
 
-    public async getUpdatedMerkleTreeRoots(): Promise<bigint[]> {
-        const merkleTrees = await this.getUpdatedMerkleTree();
-        return merkleTrees.merkleTrees.map(tree => treeNodeToBigint(tree.root))
-    }
-
-    public async getMerkleProof(treeIndex: [number, number]): Promise<IMTMerkleProof> {
-        const merkleTrees = await this.getUpdatedMerkleTree();
-        return merkleTrees.merkleTrees[treeIndex[0]].createProof(treeIndex[1])
-    }
-
     public get registeredKeys() {return this._registeredKeys}
     public getMerkleTreeLeafIndex(address: Address, key: bigint): [number, number] {
         const addressIndex = this.registeredKeys.findIndex(entry => entry.address.equals(address));
@@ -334,6 +324,14 @@ export class TokamakL2MerkleTrees {
     public addMerkleTree(address: Address, mt: IMT) {
         this._addresses.push(address);
         this._merkleTrees.push(mt);
+    }
+
+    public getRoots(): bigint[] {
+        return this.merkleTrees.map((tree) => treeNodeToBigint(tree.root));
+    }
+
+    public getProof(treeIndex: [number, number]): IMTMerkleProof {
+        return this.merkleTrees[treeIndex[0]].createProof(treeIndex[1]);
     }
 
     public static async buildFromTokamakL2StateManager(mpt: TokamakL2StateManager): Promise<TokamakL2MerkleTrees> {
