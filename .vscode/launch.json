@@ -33,6 +33,23 @@
       "cwd": "${workspaceFolder}",
       "skipFiles": ["<node_internals>/**"],
       "console": "integratedTerminal"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Run Channel End-to-End",
+      "runtimeExecutable": "tsx",
+      "program": "${workspaceFolder}/examples/channel/run-channel.ts",
+      "args": [
+        "${workspaceFolder}/examples/channel/inputStateSnapshot.json",
+        "${workspaceFolder}/examples/channel/transactionConfig.json",
+        "${workspaceFolder}/examples/channel/blockInfo.json",
+        "${workspaceFolder}/examples/channel/contractCode.json",
+        "${workspaceFolder}/examples/channel/outputStateSnapshot.json"
+      ],
+      "cwd": "${workspaceFolder}",
+      "skipFiles": ["<node_internals>/**"],
+      "console": "integratedTerminal"
     }
   ]
 }
