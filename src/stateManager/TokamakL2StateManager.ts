@@ -1,5 +1,5 @@
 import { MerkleStateManager } from "@ethereumjs/statemanager";
-import { MerkleTreeLeavesForAddress, RegisteredKeysForAddress, TokamakL2StateManagerOpts } from "./types.js";
+import { MerkleTreeLeavesForAddress, RegisteredKeysForAddress, TokamakL2StateManagerOpts, TrackedStorageKeysForAddress } from "./types.js";
 import { StateManagerInterface } from "@ethereumjs/common";
 import { IMT, IMTHashFunction, IMTMerkleProof, IMTNode } from "@zk-kit/imt"
 import { addHexPrefix, Address, bytesToBigInt, bytesToHex, concatBytes, createAccount, createAddressFromString, hexToBigInt, hexToBytes, setLengthLeft } from "@ethereumjs/util";
@@ -10,13 +10,6 @@ import { poseidon, poseidon_raw } from "../crypto/index.js";
 import { batchBigIntTo32BytesEach } from "../utils/index.js";
 import { StateSnapshot } from "../interface/stateSnapshot/types.js";
 import { treeNodeToBigint } from "./utils.js";
-
-
-
-type TrackedStorageKeysForAddress = {
-    address: Address
-    keys: Map<bigint, `0x${string}`>
-}
 
 export class TokamakL2StateManager extends MerkleStateManager implements StateManagerInterface {
     private _cachedOpts: TokamakL2StateManagerOpts | null = null
