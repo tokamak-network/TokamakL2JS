@@ -1,22 +1,13 @@
-// Usage: tsx examples/stateManager/fromStateSnapshot/create-state-manager.ts <config.json> <snapshot.json>
+// Usage: tsx examples/stateManager/fromStateSnapshot/create-state-manager.ts <snapshot.json>
 
 import { promises as fs } from 'fs';
-import { Common, Mainnet, Sepolia } from '@ethereumjs/common';
+import { Common, Mainnet } from '@ethereumjs/common';
 import { bigIntToHex, createAddressFromString } from '@ethereumjs/util';
 import {
   createTokamakL2StateManagerFromStateSnapshot,
   getEddsaPublicKey,
   poseidon,
 } from '../../../src/index.ts';
-
-type ExampleSnapshotConfig = {
-  network: 'mainnet' | 'sepolia';
-  entryContractAddress: `0x${string}`;
-  contractCodes: {
-    address: `0x${string}`;
-    code: `0x${string}`;
-  }[];
-};
 
 type ExampleStateSnapshot = {
   channelId: number;
@@ -26,45 +17,31 @@ type ExampleStateSnapshot = {
   entryContractAddress: string;
 };
 
-const getCommonForNetwork = (network: ExampleSnapshotConfig['network']): Common => {
-  const chain = network === 'sepolia' ? Sepolia : Mainnet;
+const createExampleCommon = (): Common => {
   return new Common({
     chain: {
-      ...chain,
+      ...Mainnet,
     },
     customCrypto: { keccak256: poseidon, ecrecover: getEddsaPublicKey },
   });
 };
 
 const main = async () => {
-  const configPath = process.argv[2];
-  const snapshotPath = process.argv[3];
-  if (!configPath || !snapshotPath) {
+  const snapshotPath = process.argv[2];
+  if (!snapshotPath) {
     throw new Error(
-      'Config and snapshot file paths are required. Usage: tsx examples/stateManager/fromStateSnapshot/create-state-manager.ts <config.json> <snapshot.json>'
+      'Snapshot file path is required. Usage: tsx examples/stateManager/fromStateSnapshot/create-state-manager.ts <snapshot.json>'
     );
   }
 
-  const config: ExampleSnapshotConfig = JSON.parse(await fs.readFile(configPath, 'utf8'));
   const snapshot: ExampleStateSnapshot = JSON.parse(await fs.readFile(snapshotPath, 'utf8'));
 
-  if (
-    snapshot.entryContractAddress.toLowerCase() !==
-    config.entryContractAddress.toLowerCase()
-  ) {
-    throw new Error('The snapshot entry contract address must match the example config.');
-  }
-
   const stateManager = await createTokamakL2StateManagerFromStateSnapshot(snapshot, {
-    common: getCommonForNetwork(config.network),
-    entryContractAddress: createAddressFromString(config.entryContractAddress),
+    common: createExampleCommon(),
+    entryContractAddress: createAddressFromString(snapshot.entryContractAddress),
     storageAddresses: snapshot.storageAddresses.map((address) =>
       createAddressFromString(address)
     ),
-    contractCodes: config.contractCodes.map((entry) => ({
-      address: createAddressFromString(entry.address),
-      code: entry.code,
-    })),
   });
 
   const merkleTrees = await stateManager.getUpdatedMerkleTree();

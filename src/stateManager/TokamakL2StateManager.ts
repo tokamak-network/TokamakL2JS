@@ -112,7 +112,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
     }
 
     async fetchStorageFromSnapshot(snapshot: StateSnapshot, opts: TokamakL2StateManagerOpts): Promise<void> {
-        for (const codeInfo of opts.contractCodes) {
+        for (const codeInfo of opts.contractCodes ?? []) {
             await this.putCode(codeInfo.address, hexToBytes(codeInfo.code));
         }
         if (this._registeredKeys !== null) {
