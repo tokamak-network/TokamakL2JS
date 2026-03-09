@@ -1,8 +1,10 @@
+import { jubjub } from "@noble/curves/misc.js";
 import { setLengthLeft, utf8ToBytes } from "@ethereumjs/util";
 
 // Params locally used
 export const ANY_LARGE_GAS_LIMIT = 9999999999999999n;
 export const ANY_LARGE_GAS_PRICE = 9999999n;
+export const NULL_STORAGE_KEY = jubjub.Point.Fn.ORDER - 1n;
 
 // Params to feed channel interface
 export const DST_NONCE = setLengthLeft(utf8ToBytes("TokamakAuth‑EDDSA‑NONCE‑v1"), 32);
