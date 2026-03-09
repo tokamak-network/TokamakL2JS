@@ -1,10 +1,10 @@
 import { Common } from "@ethereumjs/common";
 import { Address } from "@ethereumjs/util";
 import { IMT } from "@zk-kit/imt";
+import { MerkleStateManagerOpts } from "@ethereumjs/statemanager";
 
 export type MerkleTreeLeavesForAddress = {address: Address, leaves: bigint[]};
 export type RegisteredKeysForAddress = {address: Address, keys: Uint8Array[]};
-export type PermutationForAddress = {address: Address, permutation: number[]};
 
 export type storageKeysForAddress = {
     address: Address,
@@ -18,7 +18,7 @@ export type contractCodeForAddress = {
     code: `0x${string}`,
 };
 
-export type TokamakL2StateManagerOpts = {
+export type TokamakL2StateManagerOpts = MerkleStateManagerOpts & {
     common: Common,
     entryContractAddress: Address,
     initStorageKeys?: storageKeysForAddress[],
