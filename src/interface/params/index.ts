@@ -13,5 +13,5 @@ export const DST_NONCE = setLengthLeft(utf8ToBytes("TokamakAuth‑EDDSA‑NONCE�
 
 // Params to feed QAP Compiler 
 export const POSEIDON_INPUTS = 2;
-export const MT_DEPTH = 11;
+export const MT_DEPTH = 10;
 export const MAX_MT_LEAVES = POSEIDON_INPUTS ** MT_DEPTH;
