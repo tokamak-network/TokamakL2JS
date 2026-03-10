@@ -113,22 +113,11 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
 
     async fetchStorageFromRPC(rpcUrl: string, opts: TokamakL2StateManagerOpts): Promise<void> {
         const provider = new ethers.JsonRpcProvider(rpcUrl)
-        const blockTag = opts.blockNumber
-        const normalizeRpcError = (error: unknown): Error => {
-            if (blockTag !== undefined && error instanceof Error && error.message.includes('block not found')) {
-                return new Error(
-                    `RPC endpoint does not provide historical state for block ${blockTag}. Use an archive-capable RPC or omit blockNumber to read the latest state.`
-                )
-            }
-            return error instanceof Error ? error : new Error(String(error))
+        if (opts.blockNumber === undefined ) {
+            throw new Error('Creating TokamakL2StateManager from RPC requires a block number.')
         }
         for (const addr of opts.callCodeAddresses) {
-            let byteCodeStr: string
-            try {
-                byteCodeStr = await provider.getCode(addr.toString(), blockTag)
-            } catch (error) {
-                throw normalizeRpcError(error)
-            }
+            const byteCodeStr = await provider.getCode(addr.toString(), opts.blockNumber)
             await this.putCode(addr, hexToBytes(addHexPrefix(byteCodeStr)))
         }
         if (opts.initStorageKeys === undefined) {
@@ -155,12 +144,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
                     throw new Error(`Duplication in L2 MPT keys.`);
                 }
 
-                let v: string
-                try {
-                    v = await provider.getStorage(keysByAddress.address.toString(), bytesToBigInt(keys.L1), blockTag);
-                } catch (error) {
-                    throw normalizeRpcError(error)
-                }
+                const v = await provider.getStorage(keysByAddress.address.toString(), bytesToBigInt(keys.L1), opts.blockNumber);
                 const vBytes = hexToBytes(addHexPrefix(v));
                 await this.putStorage(keysByAddress.address, keys.L2, vBytes);
 

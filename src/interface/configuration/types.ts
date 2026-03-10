@@ -15,7 +15,7 @@ export type ChannelStateConfig = {
   storageConfigs: ChannelStorageConfig[];
   entryContractAddress: `0x${string}`;
   callCodeAddresses: `0x${string}`[];
-  blockNumber?: number;
+  blockNumber: number;
 }
 
 export type ChannelErc20TransferTxConfig = {

@@ -33,7 +33,7 @@
       "prvSeedL2": "For simulation"
     }
   ],
-  "network": "sepolia",
+  "network": "mainnet",
   "storageConfigs": [
     {
       "address": "0x2be5e8c109e2197D077D13A82dAead6a9b3433C5",
@@ -45,6 +45,7 @@
       ]
     }
   ],
+  "blockNumber": 23224548,
   "entryContractAddress": "0x2be5e8c109e2197D077D13A82dAead6a9b3433C5",
   "callCodeAddresses": ["0x43506849d7c04f9138d1a2050bbf3a0c054402dd"]
 }
