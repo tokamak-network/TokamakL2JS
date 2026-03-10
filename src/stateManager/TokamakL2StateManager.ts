@@ -13,11 +13,32 @@ import { treeNodeToBigint } from "./utils.js";
 export class TokamakL2StateManager extends MerkleStateManager implements StateManagerInterface {
     private _cachedOpts: TokamakL2StateManagerOpts | null = null
     private _registeredKeys: RegisteredKeysForAddress[] | null = null
+    private _registeredKeyIndexByAddress: Map<bigint, Set<bigint>> = new Map()
     private _trackedStorageKeys: Map<bigint, TrackedStorageKeysForAddress> = new Map()
     private _lastMerkleTrees: TokamakL2MerkleTrees | null = null
 
+    private getAddressKey(address: Address): bigint {
+        return bytesToBigInt(address.bytes)
+    }
+
+    private requireRegisteredKeys(): RegisteredKeysForAddress[] {
+        if (this._registeredKeys === null) {
+            throw new Error('Registered storage keys are not initialized.')
+        }
+        return this._registeredKeys
+    }
+
+    private rebuildRegisteredKeyIndex(): void {
+        this._registeredKeyIndexByAddress = new Map(
+            this.requireRegisteredKeys().map((entry) => [
+                this.getAddressKey(entry.address),
+                new Set(entry.keys.map((key) => bytesToBigInt(key))),
+            ])
+        )
+    }
+
     private trackStorageKey(address: Address, key: Uint8Array): void {
-        const addressBigInt = bytesToBigInt(address.bytes)
+        const addressBigInt = this.getAddressKey(address)
         let trackedKeysForAddress = this._trackedStorageKeys.get(addressBigInt)
         if (trackedKeysForAddress === undefined) {
             trackedKeysForAddress = {
@@ -26,7 +47,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             }
             this._trackedStorageKeys.set(addressBigInt, trackedKeysForAddress)
         }
-        const keyHex = addHexPrefix(bytesToHex(key)) as `0x${string}`
+        const keyHex = addHexPrefix(bytesToHex(key))
         const keyBigInt = hexToBigInt(keyHex)
         if (!trackedKeysForAddress.keys.has(keyBigInt)) {
             trackedKeysForAddress.keys.set(keyBigInt, keyHex)
@@ -34,12 +55,8 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
     }
 
     private syncRegisteredKeysFromTrackedStorage(): void {
-        if (this._registeredKeys === null) {
-            throw new Error('Registered storage keys are not initialized.')
-        }
-
         const registeredByAddress = new Map<bigint, RegisteredKeysForAddress>(
-            this._registeredKeys.map((entry) => [bytesToBigInt(entry.address.bytes), entry])
+            this.requireRegisteredKeys().map((entry) => [this.getAddressKey(entry.address), entry])
         )
 
         for (const [addressBigInt, trackedKeysForAddress] of this._trackedStorageKeys.entries()) {
@@ -49,21 +66,25 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
                     address: trackedKeysForAddress.address,
                     keys: [],
                 }
-                this._registeredKeys.push(registeredKeysForAddress)
+                this.requireRegisteredKeys().push(registeredKeysForAddress)
                 registeredByAddress.set(addressBigInt, registeredKeysForAddress)
+                this._registeredKeyIndexByAddress.set(addressBigInt, new Set())
             }
 
-            const knownKeys = new Set<bigint>(
-                registeredKeysForAddress.keys.map((entry) => bytesToBigInt(entry))
-            )
+            const knownKeys = this._registeredKeyIndexByAddress.get(addressBigInt)
+            if (knownKeys === undefined) {
+                throw new Error('Registered storage key index is not initialized.')
+            }
             for (const [keyBigInt, keyHex] of trackedKeysForAddress.keys.entries()) {
                 if (knownKeys.has(keyBigInt)) {
                     continue
                 }
-                registeredKeysForAddress.keys.push(hexToBytes(addHexPrefix(keyHex)))
+                registeredKeysForAddress.keys.push(hexToBytes(keyHex))
                 knownKeys.add(keyBigInt)
             }
         }
+
+        this._trackedStorageKeys.clear()
     }
 
     public async initTokamakExtendsFromRPC(rpcUrl: string, opts: TokamakL2StateManagerOpts): Promise<void> {
@@ -158,6 +179,8 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
                 keys: registeredL2Keys,
             });
         }
+        this.rebuildRegisteredKeyIndex();
+        this._trackedStorageKeys.clear();
         await this.flush();
     }
 
@@ -185,6 +208,8 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
                 keys: registeredKeysForAddress,
             });
         }
+        this.rebuildRegisteredKeyIndex();
+        this._trackedStorageKeys.clear();
         await this.flush();
     }
 

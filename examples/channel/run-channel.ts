@@ -76,9 +76,7 @@ const createSignatureFromSeed = (seed: string): `0x${string}` => {
 
 const parseHexBigInt = (value: `0x${string}`): bigint => hexToBigInt(addHexPrefix(value));
 const formatStorageKey = (value: bigint): `0x${string}` =>
-  addHexPrefix(bigIntToBytes(value).length === 32
-    ? bytesToHex(bigIntToBytes(value))
-    : bytesToHex(setLengthLeft(bigIntToBytes(value), 32))) as `0x${string}`;
+  addHexPrefix(bytesToHex(setLengthLeft(bigIntToBytes(value), 32)));
 
 const getRegisteredKeySetForContract = (
   snapshot: StateSnapshot,
@@ -116,7 +114,9 @@ const main = async () => {
   const contractAddress = createAddressFromString(transactionConfig.contractAddress);
   const entryContractAddress = createAddressFromString(inputSnapshot.entryContractAddress);
   if (!entryContractAddress.equals(contractAddress)) {
-    throw new Error('The snapshot entry contract address must match the transaction config.');
+    throw new Error(
+      `The snapshot entry contract address (${entryContractAddress.toString()}) must match the transaction config (${contractAddress.toString()}).`
+    );
   }
 
   const common = getCommonForNetwork(transactionConfig.network);
@@ -214,7 +214,7 @@ const main = async () => {
   }
   if (appendedKeys.length !== 1 || appendedKeys[0] !== formatStorageKey(recipientStorageKeyBigInt)) {
     throw new Error(
-      `The add-registered-key example expects exactly one appended key for the recipient, but got ${JSON.stringify(appendedKeys)}`
+      `The add-registered-key example expects exactly one appended key for the recipient, but got ${appendedKeys.length} keys.`
     );
   }
   await fs.writeFile(outputPath, `${JSON.stringify(outputSnapshot, null, 2)}\n`);
