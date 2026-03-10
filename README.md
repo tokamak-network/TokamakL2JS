@@ -53,7 +53,9 @@ console.log(senderKeys.publicKey.length, recipientAddress.toString(), !!common)
 - State manager from RPC example:
   [`examples/stateManager/fromRPC/create-state-manager.ts`](./examples/stateManager/fromRPC/create-state-manager.ts)
   ```bash
-  RPC_URL=https://your-rpc.example npx tsx examples/stateManager/fromRPC/create-state-manager.ts examples/stateManager/fromRPC/config.json
+  SEPOLIA_RPC_URL=https://your-sepolia-rpc.example \
+  MAINNET_RPC_URL=https://your-mainnet-rpc.example \
+  npx tsx examples/stateManager/fromRPC/create-state-manager.ts examples/stateManager/fromRPC/config.json
   ```
 
 ## API Surface

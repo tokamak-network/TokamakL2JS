@@ -6,10 +6,8 @@ import {
   createTokamakL2StateManagerFromL1RPC,
   type ChannelErc20TransferTxSimulationConfig,
 } from '../../../src/index.js';
-import { getRpcUrlFromEnv } from './utils.js';
+import { getRpcUrlForNetwork } from './utils.js';
 import { bigIntToHex } from '@ethereumjs/util';
-
-const RPC_URL_ENV_KEY = 'RPC_URL';
 
 const main = async () => {
   const configPath = process.argv[2];
@@ -18,7 +16,7 @@ const main = async () => {
   }
 
   const config: ChannelErc20TransferTxSimulationConfig = JSON.parse(await fs.readFile(configPath, 'utf8'));
-  const rpcUrl = getRpcUrlFromEnv(RPC_URL_ENV_KEY);
+  const rpcUrl = getRpcUrlForNetwork(config.network);
   const stateManagerOpts = createStateManagerOptsFromChannelConfig(config);
 
   const stateManager = await createTokamakL2StateManagerFromL1RPC(rpcUrl, stateManagerOpts);
