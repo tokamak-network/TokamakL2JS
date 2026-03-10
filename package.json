@@ -1,6 +1,6 @@
 {
   "name": "tokamak-l2js",
-  "version": "0.0.23",
+  "version": "0.0.24",
   "description": "TypeScript toolkit for Tokamak Network Layer-2 ZKP transactions, state management, and Poseidon/EDDSA cryptography.",
   "keywords": [
     "tokamak",
