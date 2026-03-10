@@ -63,12 +63,14 @@ export function createStateManagerOptsFromChannelConfig(
     customCrypto: { keccak256: poseidon, ecrecover: getEddsaPublicKey },
   };
   const common = new Common(commonOpts);
+  const storageAddresses = initStorageKeys.map((entry) => entry.address);
 
   return {
     common,
     blockNumber: config.blockNumber,
     entryContractAddress: createAddressFromString(config.entryContractAddress),
     initStorageKeys,
+    storageAddresses,
     callCodeAddresses: config.callCodeAddresses.map((str) =>
       createAddressFromString(str)
     ),
