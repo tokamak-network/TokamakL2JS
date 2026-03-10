@@ -56,6 +56,7 @@ console.log(senderKeys.publicKey.length, recipientAddress.toString(), !!common)
   ALCHEMY_KEY=your-alchemy-key \
   npx tsx examples/stateManager/fromRPC/create-state-manager.ts examples/stateManager/fromRPC/config.json
   ```
+  `blockNumber` in the config is optional. If you set it, your RPC must support historical state lookups for that block.
 
 ## API Surface
 
