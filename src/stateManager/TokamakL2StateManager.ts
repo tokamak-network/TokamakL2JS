@@ -5,9 +5,8 @@ import { IMT, IMTHashFunction, IMTMerkleProof, IMTNode } from "@zk-kit/imt"
 import { addHexPrefix, Address, bytesToBigInt, bytesToHex, concatBytes, createAccount, createAddressFromString, hexToBigInt, hexToBytes, setLengthLeft } from "@ethereumjs/util";
 import { ethers } from "ethers";
 import { RLP } from "@ethereumjs/rlp";
-import { MAX_MT_LEAVES, MT_DEPTH, NULL_STORAGE_KEY, POSEIDON_INPUTS } from "../interface/params/index.js";
+import { MAX_MT_LEAVES, MT_DEPTH, NULL_LEAF, POSEIDON_INPUTS } from "../interface/params/index.js";
 import { poseidon, poseidon_raw } from "../crypto/index.js";
-import { batchBigIntTo32BytesEach } from "../utils/index.js";
 import { StateSnapshot } from "../interface/stateSnapshot/types.js";
 import { treeNodeToBigint } from "./utils.js";
 
@@ -201,7 +200,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
                 const key = registeredKeysForAddress.keys[index];
                 let leafData: Uint8Array;
                 if (key === undefined) {
-                    leafData = batchBigIntTo32BytesEach(NULL_STORAGE_KEY, 0n);
+                    leafData = NULL_LEAF;
                 } else {
                     const val = await this.getStorage(address, key);
                     leafData = concatBytes(...[
