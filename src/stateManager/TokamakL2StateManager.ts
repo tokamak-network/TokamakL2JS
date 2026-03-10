@@ -14,6 +14,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
     private _cachedOpts: TokamakL2StateManagerOpts | null = null
     private _registeredKeys: RegisteredKeysForAddress[] | null = null
     private _trackedStorageKeys: Map<bigint, TrackedStorageKeysForAddress> = new Map()
+    private _lastMerkleTrees: TokamakL2MerkleTrees | null = null
 
     private trackStorageKey(address: Address, key: Uint8Array): void {
         const addressBigInt = bytesToBigInt(address.bytes)
@@ -73,6 +74,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
 
         await this.initTokamakExtend(opts);
         await this.fetchStorageFromRPC(rpcUrl, opts);
+        await this._getUpdatedMerkleTree();
     }
 
     public async initTokamakExtendsFromSnapshot(snapshot: StateSnapshot, opts: TokamakL2StateManagerOpts): Promise<void> {
@@ -84,7 +86,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         await this.initTokamakExtend(opts);
         await this.fetchStorageFromSnapshot(snapshot, opts);
 
-        const merkleTrees = await this.getUpdatedMerkleTree();
+        const merkleTrees = await this._getUpdatedMerkleTree();
         if (merkleTrees.merkleTrees.length !== snapshot.stateRoots.length) {
             throw new Error(`Inconsistent numbers of Merkle trees between state manager and state snapshot.`)
         }
@@ -189,6 +191,9 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
     async putStorage(address: Address, key: Uint8Array, value: Uint8Array): Promise<void> {
         await super.putStorage(address, key, value)
         this.trackStorageKey(address, key)
+        if (this._lastMerkleTrees !== null) {
+            await this._getUpdatedMerkleTree()
+        }
     }
 
     public async convertLeavesIntoMerkleTreeLeavesForAddress(): Promise<MerkleTreeLeavesForAddress[]> {
@@ -215,13 +220,20 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         return leaves
     }
 
-    public async getUpdatedMerkleTree(): Promise<TokamakL2MerkleTrees> {
+    private async _getUpdatedMerkleTree(): Promise<TokamakL2MerkleTrees> {
         await this.flush();
         this.syncRegisteredKeysFromTrackedStorage();
-        return TokamakL2MerkleTrees.buildFromTokamakL2StateManager(this)
+        this._lastMerkleTrees = await TokamakL2MerkleTrees.buildFromTokamakL2StateManager(this)
+        return this._lastMerkleTrees
     }
 
     public get registeredKeys() {return this._registeredKeys}
+    public get lastMerkleTrees(): TokamakL2MerkleTrees {
+        if (this._lastMerkleTrees === null) {
+            throw new Error('Merkle trees are not initialized.')
+        }
+        return this._lastMerkleTrees
+    }
     public getMerkleTreeLeafIndex(address: Address, key: bigint): [number, number] {
         const addressIndex = this.registeredKeys.findIndex(entry => entry.address.equals(address));
         if (addressIndex === -1) {
@@ -255,7 +267,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             }
         }
 
-        const merkleTrees = await this.getUpdatedMerkleTree();
+        const merkleTrees = this.lastMerkleTrees;
         const registeredKeysByAddress = new Map<string, Uint8Array[]>(
             this.registeredKeys.map((entry) => [entry.address.toString().toLowerCase(), entry.keys])
         );

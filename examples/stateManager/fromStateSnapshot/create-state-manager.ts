@@ -44,7 +44,7 @@ const main = async () => {
     ),
   });
 
-  const merkleTrees = await stateManager.getUpdatedMerkleTree();
+  const merkleTrees = stateManager.lastMerkleTrees;
   console.log('TokamakL2StateManager created from StateSnapshot.');
   console.log(`Merkle roots: ${merkleTrees.getRoots().map((root) => bigIntToHex(root))}`);
 };

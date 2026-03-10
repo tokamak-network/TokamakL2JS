@@ -20,7 +20,7 @@ const main = async () => {
   const stateManagerOpts = createStateManagerOptsFromChannelConfig(config);
 
   const stateManager = await createTokamakL2StateManagerFromL1RPC(rpcUrl, stateManagerOpts);
-  const merkleTrees = await stateManager.getUpdatedMerkleTree();
+  const merkleTrees = stateManager.lastMerkleTrees;
   console.log('TokamakL2StateManager created.');
   console.log(`Merkle roots: ${merkleTrees.getRoots().map((root) => bigIntToHex(root))}`);
 };
