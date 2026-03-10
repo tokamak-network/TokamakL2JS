@@ -10,9 +10,7 @@ fi
 
 declare -a CHECKS=(
   "snapshot.storageAddresses.length !== snapshot.registeredKeys.length|snapshot registeredKeys length guard"
-  "snapshot.storageAddresses.length !== snapshot.preAllocatedLeaves.length|snapshot preAllocatedLeaves length guard"
-  "snapshot.storageAddresses.length !== snapshot.storageEntries.length|snapshot storageEntries length guard"
-  "this._initialMerkleTrees.merkleTrees.some((tree, idx) => treeNodeToBigint(tree.root) !== hexToBigInt(addHexPrefix(snapshot.stateRoots[idx])))|snapshot root mismatch guard"
+  "merkleTrees.merkleTrees.some((tree, idx) => treeNodeToBigint(tree.root) !== hexToBigInt(addHexPrefix(snapshot.stateRoots[idx])))|snapshot root mismatch guard"
   "if (addressIndex === -1) {|missing-address leaf index guard"
   "return [-1, -1];|missing-address sentinel return"
 )

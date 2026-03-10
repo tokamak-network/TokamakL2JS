@@ -4,10 +4,21 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "Create a TokamakL2StateManager",
+      "name": "Create a TokamakL2StateManager from RPC",
       "runtimeExecutable": "tsx",
       "program": "${workspaceFolder}/examples/stateManager/fromRPC/create-state-manager.ts",
       "args": ["${workspaceFolder}/examples/stateManager/fromRPC/config.json"],
+      "cwd": "${workspaceFolder}",
+      "skipFiles": ["<node_internals>/**"],
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Create a TokamakL2StateManager from StateSnapshot",
+      "runtimeExecutable": "tsx",
+      "program": "${workspaceFolder}/examples/stateManager/fromStateSnapshot/create-state-manager.ts",
+      "args": ["${workspaceFolder}/examples/stateManager/fromStateSnapshot/snapshot.json"],
       "cwd": "${workspaceFolder}",
       "skipFiles": ["<node_internals>/**"],
       "console": "integratedTerminal"
@@ -19,6 +30,23 @@
       "runtimeExecutable": "tsx",
       "program": "${workspaceFolder}/examples/transaction/create-tx.ts",
       "args": ["${workspaceFolder}/examples/transaction/config.json"],
+      "cwd": "${workspaceFolder}",
+      "skipFiles": ["<node_internals>/**"],
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Run Channel Add Registered Key",
+      "runtimeExecutable": "tsx",
+      "program": "${workspaceFolder}/examples/channel/run-channel.ts",
+      "args": [
+        "${workspaceFolder}/examples/channel/configs/add-registered-key/input-state-snapshot.json",
+        "${workspaceFolder}/examples/channel/configs/add-registered-key/transaction-config.json",
+        "${workspaceFolder}/examples/channel/configs/add-registered-key/block-info.json",
+        "${workspaceFolder}/examples/channel/configs/add-registered-key/contract-code.json",
+        "${workspaceFolder}/examples/channel/configs/add-registered-key/output-state-snapshot.json"
+      ],
       "cwd": "${workspaceFolder}",
       "skipFiles": ["<node_internals>/**"],
       "console": "integratedTerminal"

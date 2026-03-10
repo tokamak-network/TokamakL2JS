@@ -4,7 +4,10 @@ import { IMT } from "@zk-kit/imt";
 
 export type MerkleTreeLeavesForAddress = {address: Address, leaves: bigint[]};
 export type RegisteredKeysForAddress = {address: Address, keys: Uint8Array[]};
-export type PermutationForAddress = {address: Address, permutation: number[]};
+export type TrackedStorageKeysForAddress = {
+    address: Address,
+    keys: Map<bigint, `0x${string}`>,
+};
 
 export type storageKeysForAddress = {
     address: Address,

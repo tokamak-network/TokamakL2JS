@@ -1,22 +1,70 @@
 import { MerkleStateManager } from "@ethereumjs/statemanager";
-import { MerkleTreeLeavesForAddress, PermutationForAddress, RegisteredKeysForAddress, TokamakL2StateManagerOpts } from "./types.js";
+import { MerkleTreeLeavesForAddress, RegisteredKeysForAddress, TokamakL2StateManagerOpts, TrackedStorageKeysForAddress } from "./types.js";
 import { StateManagerInterface } from "@ethereumjs/common";
 import { IMT, IMTHashFunction, IMTMerkleProof, IMTNode } from "@zk-kit/imt"
 import { addHexPrefix, Address, bytesToBigInt, bytesToHex, concatBytes, createAccount, createAddressFromString, hexToBigInt, hexToBytes, setLengthLeft } from "@ethereumjs/util";
 import { ethers } from "ethers";
 import { RLP } from "@ethereumjs/rlp";
-import { MAX_MT_LEAVES, MT_DEPTH, POSEIDON_INPUTS } from "../interface/params/index.js";
+import { MAX_MT_LEAVES, MT_DEPTH, NULL_STORAGE_KEY, POSEIDON_INPUTS } from "../interface/params/index.js";
 import { poseidon, poseidon_raw } from "../crypto/index.js";
 import { batchBigIntTo32BytesEach } from "../utils/index.js";
 import { StateSnapshot } from "../interface/stateSnapshot/types.js";
 import { treeNodeToBigint } from "./utils.js";
 
-
-
 export class TokamakL2StateManager extends MerkleStateManager implements StateManagerInterface {
     private _cachedOpts: TokamakL2StateManagerOpts | null = null
     private _registeredKeys: RegisteredKeysForAddress[] | null = null
-    private _initialMerkleTrees: TokamakL2MerkleTrees | null = null
+    private _trackedStorageKeys: Map<bigint, TrackedStorageKeysForAddress> = new Map()
+
+    private trackStorageKey(address: Address, key: Uint8Array): void {
+        const addressBigInt = bytesToBigInt(address.bytes)
+        let trackedKeysForAddress = this._trackedStorageKeys.get(addressBigInt)
+        if (trackedKeysForAddress === undefined) {
+            trackedKeysForAddress = {
+                address,
+                keys: new Map(),
+            }
+            this._trackedStorageKeys.set(addressBigInt, trackedKeysForAddress)
+        }
+        const keyHex = addHexPrefix(bytesToHex(key)) as `0x${string}`
+        const keyBigInt = hexToBigInt(keyHex)
+        if (!trackedKeysForAddress.keys.has(keyBigInt)) {
+            trackedKeysForAddress.keys.set(keyBigInt, keyHex)
+        }
+    }
+
+    private syncRegisteredKeysFromTrackedStorage(): void {
+        if (this._registeredKeys === null) {
+            throw new Error('Registered storage keys are not initialized.')
+        }
+
+        const registeredByAddress = new Map<bigint, RegisteredKeysForAddress>(
+            this._registeredKeys.map((entry) => [bytesToBigInt(entry.address.bytes), entry])
+        )
+
+        for (const [addressBigInt, trackedKeysForAddress] of this._trackedStorageKeys.entries()) {
+            let registeredKeysForAddress = registeredByAddress.get(addressBigInt)
+            if (registeredKeysForAddress === undefined) {
+                registeredKeysForAddress = {
+                    address: trackedKeysForAddress.address,
+                    keys: [],
+                }
+                this._registeredKeys.push(registeredKeysForAddress)
+                registeredByAddress.set(addressBigInt, registeredKeysForAddress)
+            }
+
+            const knownKeys = new Set<bigint>(
+                registeredKeysForAddress.keys.map((entry) => bytesToBigInt(entry))
+            )
+            for (const [keyBigInt, keyHex] of trackedKeysForAddress.keys.entries()) {
+                if (knownKeys.has(keyBigInt)) {
+                    continue
+                }
+                registeredKeysForAddress.keys.push(hexToBytes(addHexPrefix(keyHex)))
+                knownKeys.add(keyBigInt)
+            }
+        }
+    }
 
     public async initTokamakExtendsFromRPC(rpcUrl: string, opts: TokamakL2StateManagerOpts): Promise<void> {
         if (this._cachedOpts !== null) {
@@ -26,11 +74,6 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
 
         await this.initTokamakExtend(opts);
         await this.fetchStorageFromRPC(rpcUrl, opts);
-
-        if (this._initialMerkleTrees !== null) {
-            throw new Error('Merkle trees are already initialized')
-        }
-        this._initialMerkleTrees = await TokamakL2MerkleTrees.buildFromTokamakL2StateManager(this);
     }
 
     public async initTokamakExtendsFromSnapshot(snapshot: StateSnapshot, opts: TokamakL2StateManagerOpts): Promise<void> {
@@ -42,15 +85,12 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         await this.initTokamakExtend(opts);
         await this.fetchStorageFromSnapshot(snapshot, opts);
 
-        if (this._initialMerkleTrees !== null) {
-            throw new Error('Merkle tree is already initialized')
-        }
-        this._initialMerkleTrees = await TokamakL2MerkleTrees.buildFromTokamakL2StateManager(this);
-        if (this._initialMerkleTrees.merkleTrees.length !== snapshot.stateRoots.length) {
+        const merkleTrees = await this.getUpdatedMerkleTree();
+        if (merkleTrees.merkleTrees.length !== snapshot.stateRoots.length) {
             throw new Error(`Inconsistent numbers of Merkle trees between state manager and state snapshot.`)
         }
-        if (this._initialMerkleTrees.merkleTrees.some((tree, idx) => treeNodeToBigint(tree.root) !== hexToBigInt(addHexPrefix(snapshot.stateRoots[idx])))) {
-            throw new Error(`Creating TokamakL2StateManager using StateSnapshot fails: (provided roots: ${snapshot.stateRoots}, reconstructed root: ${this._initialMerkleTrees.merkleTrees.map(tree => tree.root.toString())})`)
+        if (merkleTrees.merkleTrees.some((tree, idx) => treeNodeToBigint(tree.root) !== hexToBigInt(addHexPrefix(snapshot.stateRoots[idx])))) {
+            throw new Error(`Creating TokamakL2StateManager using StateSnapshot fails: (provided roots: ${snapshot.stateRoots}, reconstructed root: ${merkleTrees.merkleTrees.map(tree => tree.root.toString())})`)
         }
     }
 
@@ -121,7 +161,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
     }
 
     async fetchStorageFromSnapshot(snapshot: StateSnapshot, opts: TokamakL2StateManagerOpts): Promise<void> {
-        for (const codeInfo of opts.contractCodes) {
+        for (const codeInfo of opts.contractCodes ?? []) {
             await this.putCode(codeInfo.address, hexToBytes(codeInfo.code));
         }
         if (this._registeredKeys !== null) {
@@ -130,24 +170,11 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         if (snapshot.storageAddresses.length !== snapshot.registeredKeys.length) {
             throw new Error('Snapshot is expected to have a set of register keys for each storage address')
         }
-        if (snapshot.storageAddresses.length !== snapshot.preAllocatedLeaves.length) {
-            throw new Error('Snapshot is expected to have a set of pre-allocated leaves for each storage address')
-        }
-        if (snapshot.storageAddresses.length !== snapshot.storageEntries.length) {
-            throw new Error('Snapshot is expected to have a set of storage entries for each storage address')
-        }
         this._registeredKeys = [];
         for (const [idx, addressStr] of snapshot.storageAddresses.entries()) {
             const address = createAddressFromString(addressStr);
-            const registeredKeysForAddress = snapshot.registeredKeys[idx].map(str => hexToBytes(addHexPrefix(str)));
-            const unorderedRegisteredKeys = [...snapshot.preAllocatedLeaves[idx], ...snapshot.storageEntries[idx]];
-            if (registeredKeysForAddress.length !== unorderedRegisteredKeys.length) {
-                    throw new Error('The registered keys in the snapshot mismatch with the pre-allocated keys and the storage keys')
-                }
-            for (const entry of unorderedRegisteredKeys) {
-                if (registeredKeysForAddress.findIndex(byteKey => bytesToBigInt(byteKey) === hexToBigInt(addHexPrefix(entry.key))) < 0 ) {
-                    throw new Error('The registered keys in the snapshot mismatch with the pre-allocated keys and the storage keys')
-                }
+            const registeredKeysForAddress = snapshot.registeredKeys[idx].map((entry) => hexToBytes(addHexPrefix(entry.key)));
+            for (const entry of snapshot.registeredKeys[idx]) {
                 const vBytes = hexToBytes(addHexPrefix(entry.value));
                 const keyBytes = hexToBytes(addHexPrefix(entry.key));
                 await this.putStorage(address, keyBytes, vBytes);
@@ -160,6 +187,11 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         await this.flush();
     }
 
+    async putStorage(address: Address, key: Uint8Array, value: Uint8Array): Promise<void> {
+        await super.putStorage(address, key, value)
+        this.trackStorageKey(address, key)
+    }
+
     public async convertLeavesIntoMerkleTreeLeavesForAddress(): Promise<MerkleTreeLeavesForAddress[]> {
         const leaves: MerkleTreeLeavesForAddress[] = [];
         for (const registeredKeysForAddress of this.registeredKeys){ 
@@ -169,7 +201,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
                 const key = registeredKeysForAddress.keys[index];
                 let leafData: Uint8Array;
                 if (key === undefined) {
-                    leafData = batchBigIntTo32BytesEach(0n, 0n);
+                    leafData = batchBigIntTo32BytesEach(NULL_STORAGE_KEY, 0n);
                 } else {
                     const val = await this.getStorage(address, key);
                     leafData = concatBytes(...[
@@ -184,43 +216,10 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         return leaves
     }
 
-    private _permuteRegisteredKeys(permutations: PermutationForAddress[]) {
-        if (this._registeredKeys === null) {
-            throw new Error('Registered storage keys must be permuted after init.')
-        }
-        for (const [idx, registeredKeysForAddress] of this.registeredKeys.entries()) {
-            const address = registeredKeysForAddress.address;
-            const permutation = permutations.find(entry => entry.address.equals(address)).permutation;
-            const permutedKeys: Uint8Array[] = registeredKeysForAddress.keys.map((arr) => new Uint8Array(arr));
-            for (const [newIdx, oldIdx] of permutation.entries()) {
-                permutedKeys[newIdx] = registeredKeysForAddress.keys[oldIdx].slice();
-            }
-            this._registeredKeys[idx] = {
-                address,
-                keys: permutedKeys
-            };
-        }
-    }
-
-    // getters
-    public get initialMerkleTrees(): TokamakL2MerkleTrees {
-        if (this._initialMerkleTrees === null) {
-            throw new Error('Merkle trees are not initialized')
-        }
-        return this._initialMerkleTrees
-    }
-
-    public async getUpdatedMerkleTreeRoots(permutations?: PermutationForAddress[]): Promise<bigint[]> {
-        if (permutations !== undefined) {
-            this._permuteRegisteredKeys(permutations);
-        }
+    public async getUpdatedMerkleTree(): Promise<TokamakL2MerkleTrees> {
         await this.flush();
-        const merkleTrees = await TokamakL2MerkleTrees.buildFromTokamakL2StateManager(this)
-        return merkleTrees.merkleTrees.map(tree => treeNodeToBigint(tree.root))
-    }
-
-    public getMerkleProof(treeIndex: [number, number]): IMTMerkleProof {
-        return this.initialMerkleTrees.merkleTrees[treeIndex[0]].createProof(treeIndex[1])
+        this.syncRegisteredKeysFromTrackedStorage();
+        return TokamakL2MerkleTrees.buildFromTokamakL2StateManager(this)
     }
 
     public get registeredKeys() {return this._registeredKeys}
@@ -248,29 +247,19 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         if (prevSnapshot.storageAddresses.length !== prevSnapshot.registeredKeys.length) {
             throw new Error('Snapshot is expected to have a set of register keys for each storage address')
         }
-        if (prevSnapshot.storageAddresses.length !== prevSnapshot.preAllocatedLeaves.length) {
-            throw new Error('Snapshot is expected to have a set of pre-allocated leaves for each storage address')
-        }
-        if (prevSnapshot.storageAddresses.length !== prevSnapshot.storageEntries.length) {
-            throw new Error('Snapshot is expected to have a set of storage entries for each storage address')
-        }
         await this.flush();
-        const getUpdatedEntry = async (
-            address: Address,
-            entry: {key: string; value: string;}
-        ): Promise<{key: string; value: string;}> => {
-            const keyBytes = hexToBytes(addHexPrefix(entry.key));
+        const getUpdatedEntry = async (address: Address, keyBytes: Uint8Array): Promise<{key: string; value: string;}> => {
             const value = await this.getStorage(address, keyBytes);
             return {
-                key: entry.key,
+                key: bytesToHex(keyBytes),
                 value: bytesToHex(value),
             }
         }
 
+        const merkleTrees = await this.getUpdatedMerkleTree();
         const registeredKeysByAddress = new Map<string, Uint8Array[]>(
             this.registeredKeys.map((entry) => [entry.address.toString().toLowerCase(), entry.keys])
         );
-        const merkleTrees = await TokamakL2MerkleTrees.buildFromTokamakL2StateManager(this);
         const rootByAddress = new Map<string, string>();
         for (const [idx, address] of merkleTrees.addresses.entries()) {
             rootByAddress.set(
@@ -279,12 +268,10 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             );
         }
 
-        const registeredKeys: string[][] = [];
-        const storageEntries: { key: string; value: string }[][] = [];
-        const preAllocatedLeaves: { key: string; value: string }[][] = [];
+        const registeredKeys: { key: string; value: string }[][] = [];
         const stateRoots: string[] = [];
 
-        for (const [idx, addressStr] of prevSnapshot.storageAddresses.entries()) {
+        for (const addressStr of prevSnapshot.storageAddresses) {
             const address = createAddressFromString(addressStr);
             const addressKey = address.toString().toLowerCase();
             const currentRegisteredKeys = registeredKeysByAddress.get(addressKey);
@@ -294,12 +281,8 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
                 throw new Error(`Cannot capture snapshot for unregistered storage address: ${addressStr}`)
             }
 
-            registeredKeys.push(currentRegisteredKeys.map((key) => bytesToHex(key)));
-            storageEntries.push(
-                await Promise.all(prevSnapshot.storageEntries[idx].map((entry) => getUpdatedEntry(address, entry)))
-            );
-            preAllocatedLeaves.push(
-                await Promise.all(prevSnapshot.preAllocatedLeaves[idx].map((entry) => getUpdatedEntry(address, entry)))
+            registeredKeys.push(
+                await Promise.all(currentRegisteredKeys.map((key) => getUpdatedEntry(address, key)))
             );
             stateRoots.push(currentRoot);
         }
@@ -309,14 +292,12 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             stateRoots,
             storageAddresses: [...prevSnapshot.storageAddresses],
             registeredKeys,
-            storageEntries,
-            preAllocatedLeaves,
             entryContractAddress: prevSnapshot.entryContractAddress,
         };
     }
 }
 
-class TokamakL2MerkleTrees {
+export class TokamakL2MerkleTrees {
     private _cachedTokamakL2StateManager: TokamakL2StateManager | null = null;
     private _addresses: Address[] = [];
     private _merkleTrees: IMT[] = [];
@@ -340,6 +321,14 @@ class TokamakL2MerkleTrees {
     public addMerkleTree(address: Address, mt: IMT) {
         this._addresses.push(address);
         this._merkleTrees.push(mt);
+    }
+
+    public getRoots(): bigint[] {
+        return this.merkleTrees.map((tree) => treeNodeToBigint(tree.root));
+    }
+
+    public getProof(treeIndex: [number, number]): IMTMerkleProof {
+        return this.merkleTrees[treeIndex[0]].createProof(treeIndex[1]);
     }
 
     public static async buildFromTokamakL2StateManager(mpt: TokamakL2StateManager): Promise<TokamakL2MerkleTrees> {

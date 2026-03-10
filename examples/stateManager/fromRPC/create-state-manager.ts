@@ -7,7 +7,6 @@ import {
   type ChannelErc20TransferTxSimulationConfig,
 } from '../../../src/index.js';
 import { getRpcUrlFromEnv } from './utils.js';
-import { treeNodeToBigint } from '../../../src/stateManager/utils.js';
 import { bigIntToHex } from '@ethereumjs/util';
 
 const RPC_URL_ENV_KEY = 'RPC_URL';
@@ -23,8 +22,9 @@ const main = async () => {
   const stateManagerOpts = createStateManagerOptsFromChannelConfig(config);
 
   const stateManager = await createTokamakL2StateManagerFromL1RPC(rpcUrl, stateManagerOpts);
+  const merkleTrees = await stateManager.getUpdatedMerkleTree();
   console.log('TokamakL2StateManager created.');
-  console.log(`Merkle roots: ${stateManager.initialMerkleTrees.merkleTrees.map(tree => bigIntToHex(treeNodeToBigint(tree.root)))}`);
+  console.log(`Merkle roots: ${merkleTrees.getRoots().map((root) => bigIntToHex(root))}`);
 };
 
 void main().catch((err) => {
