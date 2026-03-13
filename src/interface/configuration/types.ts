@@ -15,18 +15,22 @@ export type ChannelStateConfig = {
   network: ChannelStateNetwork;
   participants: ChannelParticipantConfig[];
   storageConfigs: ChannelStorageConfig[];
-  entryContractAddress: `0x${string}`;
   callCodeAddresses: `0x${string}`[];
   blockNumber: number;
 }
 
-export type ChannelErc20TransferTxConfig = {
-  txNonce: number;
-  senderIndex: number;
-  recipientIndex: number;
-  amount: `0x${string}`;
-  transferSelector: `0x${string}`;
+export type ChannelFunctionConfig = {
+  selector: `0x${string}`;
+  entryContractAddress: `0x${string}`;
 };
 
+export type ChannelTxConfig = {
+  txNonce: number;
+  calldata: `0x${string}`;
+  function: ChannelFunctionConfig;
+};
+
+export type ChannelErc20TransferTxConfig = ChannelTxConfig;
+
 export type ChannelErc20TransferTxSimulationConfig = 
-  ChannelStateConfig & ChannelErc20TransferTxConfig;
+  ChannelStateConfig & ChannelTxConfig;
