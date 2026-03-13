@@ -14,7 +14,7 @@ import {
 } from "../../stateManager/types.js";
 import { fromEdwardsToAddress, getUserStorageKey } from "../../utils/index.js";
 import { deriveL2KeysFromSignature } from "../wallet/index.js";
-import { ChannelStateConfig } from "./types.js";
+import { ChannelStateConfig, ChannelTxConfig } from "./types.js";
 
 export const DEFAULT_ANVIL_CHAIN_ID = 31337;
 
@@ -31,7 +31,7 @@ const getAnvilChainId = (value: number | undefined): number => {
 };
 
 export function createStateManagerOptsFromChannelConfig(
-  config: ChannelStateConfig,
+  config: ChannelStateConfig & Pick<ChannelTxConfig, "function">,
   options: CreateStateManagerOptsFromChannelConfigOptions = {}
 ): TokamakL2StateManagerOpts {
   const privateSignatures = config.participants.map((entry) =>
@@ -91,7 +91,7 @@ export function createStateManagerOptsFromChannelConfig(
   return {
     common,
     blockNumber: config.blockNumber,
-    entryContractAddress: createAddressFromString(config.entryContractAddress),
+    entryContractAddress: createAddressFromString(config.function.entryContractAddress),
     initStorageKeys,
     callCodeAddresses: config.callCodeAddresses.map((str) =>
       createAddressFromString(str)

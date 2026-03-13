@@ -10,7 +10,6 @@ import {
   bigIntToBytes,
   bytesToBigInt,
   bytesToHex,
-  concatBytes,
   createAddressFromString,
   hexToBigInt,
   hexToBytes,
@@ -35,9 +34,11 @@ type ChannelTransactionConfig = {
   recipientSeed: string;
   userStorageSlot: number;
   txNonce: number;
-  contractAddress: `0x${string}`;
-  transferSelector: `0x${string}`;
-  amount: `0x${string}`;
+  calldata: `0x${string}`;
+  function: {
+    selector: `0x${string}`;
+    entryContractAddress: `0x${string}`;
+  };
 };
 
 type ChannelBlockInfo = {
@@ -77,6 +78,8 @@ const createSignatureFromSeed = (seed: string): `0x${string}` => {
 const parseHexBigInt = (value: `0x${string}`): bigint => hexToBigInt(addHexPrefix(value));
 const formatStorageKey = (value: bigint): `0x${string}` =>
   addHexPrefix(bytesToHex(setLengthLeft(bigIntToBytes(value), 32)));
+const hasSelectorPrefix = (calldata: `0x${string}`, selector: `0x${string}`) =>
+  calldata.toLowerCase().startsWith(selector.toLowerCase());
 
 const getRegisteredKeySetForContract = (
   snapshot: StateSnapshot,
@@ -111,7 +114,10 @@ const main = async () => {
     await fs.readFile(contractCodePath, 'utf8')
   );
 
-  const contractAddress = createAddressFromString(transactionConfig.contractAddress);
+  const contractAddress = createAddressFromString(transactionConfig.function.entryContractAddress);
+  if (!hasSelectorPrefix(transactionConfig.calldata, transactionConfig.function.selector)) {
+    throw new Error('transactionConfig.calldata must start with transactionConfig.function.selector');
+  }
   const entryContractAddress = createAddressFromString(inputSnapshot.entryContractAddress);
   if (!entryContractAddress.equals(contractAddress)) {
     throw new Error(
@@ -167,12 +173,7 @@ const main = async () => {
     {
       nonce: BigInt(transactionConfig.txNonce),
       to: contractAddress,
-      data: concatBytes(
-        setLengthLeft(hexToBytes(transactionConfig.transferSelector), 4),
-        senderStorageKey,
-        recipientStorageKey,
-        setLengthLeft(hexToBytes(transactionConfig.amount), 32)
-      ),
+      data: hexToBytes(transactionConfig.calldata),
       senderPubKey: senderKeys.publicKey,
     },
     { common }

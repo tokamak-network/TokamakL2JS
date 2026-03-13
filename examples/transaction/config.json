@@ -1,8 +1,9 @@
 {
   "senderSeed": "Sender's L2 wallet",
-  "recipientSeed": "Recepient's L2 wallet",
   "txNonce": 0,
-  "contractAddress": "0x2be5e8c109e2197D077D13A82dAead6a9b3433C5",
-  "transferSelector": "0xa9059cbb",
-  "amount": "0x4563918244f400000"
+  "calldata": "0xa9059cbb0000000000000000000000009a9e1a51a413659fbab87110f7bc1500cdc859a1000000000000000000000000000000000000000000000004563918244f400000",
+  "function": {
+    "selector": "0xa9059cbb",
+    "entryContractAddress": "0x2be5e8c109e2197D077D13A82dAead6a9b3433C5"
+  }
 }
