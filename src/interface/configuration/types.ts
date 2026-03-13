@@ -1,3 +1,5 @@
+export type ChannelStateNetwork = 'mainnet' | 'sepolia' | 'anvil';
+
 export type ChannelParticipantConfig = {
   addressL1: `0x${string}`;
   prvSeedL2: string;
@@ -10,7 +12,7 @@ export type ChannelStorageConfig = {
 }
 
 export type ChannelStateConfig = {
-  network: 'mainnet' | 'sepolia';
+  network: ChannelStateNetwork;
   participants: ChannelParticipantConfig[];
   storageConfigs: ChannelStorageConfig[];
   entryContractAddress: `0x${string}`;

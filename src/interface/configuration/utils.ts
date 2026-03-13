@@ -16,8 +16,23 @@ import { fromEdwardsToAddress, getUserStorageKey } from "../../utils/index.js";
 import { deriveL2KeysFromSignature } from "../wallet/index.js";
 import { ChannelStateConfig } from "./types.js";
 
+export const DEFAULT_ANVIL_CHAIN_ID = 31337;
+
+export type CreateStateManagerOptsFromChannelConfigOptions = {
+  anvilChainId?: number;
+};
+
+const getAnvilChainId = (value: number | undefined): number => {
+  const chainId = value ?? DEFAULT_ANVIL_CHAIN_ID;
+  if (!Number.isSafeInteger(chainId) || chainId <= 0) {
+    throw new Error(`anvilChainId must be a positive safe integer; got ${chainId}`);
+  }
+  return chainId;
+};
+
 export function createStateManagerOptsFromChannelConfig(
-  config: ChannelStateConfig
+  config: ChannelStateConfig,
+  options: CreateStateManagerOptsFromChannelConfigOptions = {}
 ): TokamakL2StateManagerOpts {
   const privateSignatures = config.participants.map((entry) =>
     bytesToHex(jubjub.utils.randomPrivateKey(setLengthLeft(utf8ToBytes(entry.prvSeedL2), 32)))
@@ -55,7 +70,16 @@ export function createStateManagerOptsFromChannelConfig(
     });
   }
 
-  const chain = config.network === "sepolia" ? Sepolia : Mainnet;
+  const chain =
+    config.network === "sepolia"
+      ? Sepolia
+      : config.network === "anvil"
+        ? {
+            ...Mainnet,
+            name: "anvil",
+            chainId: getAnvilChainId(options.anvilChainId),
+          }
+        : Mainnet;
   const commonOpts: CommonOpts = {
     chain: {
       ...chain,
