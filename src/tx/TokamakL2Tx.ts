@@ -4,6 +4,7 @@ import { EthereumJSErrorWithoutCode, RLP } from "@ethereumjs/rlp"
 import { jubjub } from "@noble/curves/misc.js"
 import { EdwardsPoint } from "@noble/curves/abstract/edwards.js"
 import { eddsaSign, eddsaVerify, getEddsaPublicKey, poseidon } from "../crypto/index.js"
+import { FUNCTION_INPUT_LENGTH } from "../interface/params/index.js"
 import { batchBigIntTo32BytesEach, fromEdwardsToAddress } from "../utils/index.js"
 import { createTokamakL2Tx } from "./constructors.js"
 
@@ -68,7 +69,7 @@ export class TokamakL2Tx extends LegacyTx implements TransactionInterface<typeof
             this.to.bytes,
             this.getFunctionSelector(),
         ]
-        for (let inputIndex = 0; inputIndex < 9; inputIndex++) {
+        for (let inputIndex = 0; inputIndex < FUNCTION_INPUT_LENGTH; inputIndex++) {
             messageRaw.push(this.getFunctionInput(inputIndex))
         }
         return messageRaw.map(m => setLengthLeft(m, 32))

@@ -10,6 +10,7 @@ export const NULL_LEAF = batchBigIntTo32BytesEach(NULL_STORAGE_KEY, 0n);
 
 // Params to feed channel interface
 export const DST_NONCE = setLengthLeft(utf8ToBytes("TokamakAuth‑EDDSA‑NONCE‑v1"), 32);
+export const FUNCTION_INPUT_LENGTH = 29;
 
 // Params to feed QAP Compiler 
 export const POSEIDON_INPUTS = 2;
