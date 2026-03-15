@@ -48,7 +48,7 @@ export class TokamakL2Tx extends LegacyTx implements TransactionInterface<typeof
     }
 
     getUnsafeEddsaRandomizer(): EdwardsPoint | undefined {
-        return this.r === undefined ? undefined : jubjub.Point.fromBytes(bigIntToBytes(this.r))
+        return this.r === undefined ? undefined : jubjub.Point.fromBytes(setLengthLeft(bigIntToBytes(this.r), 32))
     }
 
     getUnsafeEddsaPubKey(): EdwardsPoint {
