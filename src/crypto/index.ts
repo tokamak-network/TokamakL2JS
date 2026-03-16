@@ -27,10 +27,10 @@ export function poseidon(msg: Uint8Array): Uint8Array {
       return bytesToBigInt(slice)
     });
 
-    return setLengthLeft(bigIntToBytes(
-      poseidonChainCompress(words.length === 1 ? [words[0], 0n] : words),
+    return setLengthLeft(
+      bigIntToBytes(poseidonChainCompress(words.length === 1 ? [words[0], 0n] : words)),
       32,
-    ));
+    );
 }
 
 export function poseidonChainCompress(in_vals: bigint[]): bigint {
