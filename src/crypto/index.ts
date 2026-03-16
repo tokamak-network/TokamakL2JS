@@ -27,41 +27,15 @@ export function poseidon(msg: Uint8Array): Uint8Array {
       return bytesToBigInt(slice)
     });
 
-    if (words.length === 1) {
-        return setLengthLeft(bigIntToBytes(poseidon_raw([words[0], 0n])), 32);
-    }
-
-    let acc = poseidon_raw([words[0], words[1]]);
-    for (let i = 2; i < words.length; i++) {
-        acc = poseidon_raw([acc, words[i]]);
-    }
-    return setLengthLeft(bigIntToBytes(acc), 32);
+    return setLengthLeft(bigIntToBytes(
+      poseidonChainCompress(words.length === 1 ? [words[0], 0n] : words),
+      32,
+    ));
 }
 
-export function poseidonN2xCompress(in_vals: bigint[]): bigint {
-  return poseidonChainCompress(in_vals, 2);
-}
-
-export function poseidonN3xCompress(in_vals: bigint[]): bigint {
-  return poseidonChainCompress(in_vals, 3);
-}
-
-export function poseidonN4xCompress(in_vals: bigint[]): bigint {
-  return poseidonChainCompress(in_vals, 4);
-}
-
-export function poseidonN5xCompress(in_vals: bigint[]): bigint {
-  return poseidonChainCompress(in_vals, 5);
-}
-
-export function poseidonN6xCompress(in_vals: bigint[]): bigint {
-  return poseidonChainCompress(in_vals, 6);
-}
-
-function poseidonChainCompress(in_vals: bigint[], nCalls: number): bigint {
-  const expectedLength = nCalls + 1;
-  if (in_vals.length !== expectedLength) {
-    throw new Error(`Expected exactly ${expectedLength} values, but got ${in_vals.length}`);
+export function poseidonChainCompress(in_vals: bigint[]): bigint {
+    if (in_vals.length < 2) {
+    throw new Error(`Expected at least 2 values, but got ${in_vals.length}`);
   }
 
   let acc = poseidon_raw([in_vals[0], in_vals[1]]);
