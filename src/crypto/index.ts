@@ -31,16 +31,13 @@ export function poseidon(msg: Uint8Array): Uint8Array {
         const n1xChunks = Math.ceil(arr.length / POSEIDON_INPUTS);
         const nPaddedChildren = n1xChunks * POSEIDON_INPUTS;
 
-        const mode3x: boolean = nPaddedChildren % (POSEIDON_INPUTS ** 3) === 0
-        const mode2x: boolean = !mode3x && nPaddedChildren % (POSEIDON_INPUTS ** 2) === 0
+        const mode2x: boolean = nPaddedChildren % (POSEIDON_INPUTS ** 2) === 0
 
-        const placeFunction = mode3x ?
-            poseidonN3xCompress :
-            mode2x ?
-                poseidonN2xCompress :
-                poseidon_raw
+        const placeFunction = mode2x ?
+            poseidonN2xCompress :
+            poseidon_raw
 
-        const nChildren = mode3x ? (POSEIDON_INPUTS ** 3) : mode2x ? (POSEIDON_INPUTS ** 2) : POSEIDON_INPUTS
+        const nChildren = mode2x ? (POSEIDON_INPUTS ** 2) : POSEIDON_INPUTS
 
         const out: bigint[] = [];
         for (let childId = 0; childId < nPaddedChildren; childId += nChildren) {
@@ -71,25 +68,6 @@ export function poseidonN2xCompress(in_vals: bigint[]): bigint {
   return poseidon_raw(interim);
 }
 
-export function poseidonN3xCompress(in_vals: bigint[]): bigint {
-  if (in_vals.length !== POSEIDON_INPUTS ** 3) {
-    throw new Error(`poseidon${POSEIDON_INPUTS} expected exactly ${POSEIDON_INPUTS ** 3} values`);
-  }
-
-  const leafHashes: bigint[] = [];
-  for (let k = 0; k < POSEIDON_INPUTS ** 2; k++) {
-    const children = in_vals.slice(k * POSEIDON_INPUTS, (k + 1) * POSEIDON_INPUTS);
-    leafHashes.push(poseidon_raw(children));
-  }
-
-  const parentHashes: bigint[] = [];
-  for (let k = 0; k < POSEIDON_INPUTS; k++) {
-    const children = leafHashes.slice(k * POSEIDON_INPUTS, (k + 1) * POSEIDON_INPUTS);
-    parentHashes.push(poseidon_raw(children));
-  }
-
-  return poseidon_raw(parentHashes);
-}
 
 // To replace ecrecover with Eddsa public key recovery. Example:
 // const common = new Common({ chain: Mainnet, customCrypto: { ecrecover: getEddsaPublicKey } })
