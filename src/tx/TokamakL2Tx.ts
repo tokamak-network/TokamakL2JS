@@ -82,7 +82,7 @@ export class TokamakL2Tx extends LegacyTx implements TransactionInterface<typeof
         const recovered = getEddsaPublicKey(
             concatBytes(...this.getMessageToSign(), setLengthLeft(this.senderPubKeyUnsafe, 32)),
             this.v!,
-            bigIntToBytes(this.r!),
+            setLengthLeft(bigIntToBytes(this.r!), 32),
             bigIntToBytes(this.s!)
         )
         if (!equalsBytes(this.senderPubKeyUnsafe, recovered)) {
