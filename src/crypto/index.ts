@@ -27,45 +27,48 @@ export function poseidon(msg: Uint8Array): Uint8Array {
       return bytesToBigInt(slice)
     });
 
-    const fold = (arr: bigint[]): bigint[] => {
-        const n1xChunks = Math.ceil(arr.length / POSEIDON_INPUTS);
-        const nPaddedChildren = n1xChunks * POSEIDON_INPUTS;
+    if (words.length === 1) {
+        return setLengthLeft(bigIntToBytes(poseidon_raw([words[0], 0n])), 32);
+    }
 
-        const mode2x: boolean = nPaddedChildren % (POSEIDON_INPUTS ** 2) === 0
-
-        const placeFunction = mode2x ?
-            poseidonN2xCompress :
-            poseidon_raw
-
-        const nChildren = mode2x ? (POSEIDON_INPUTS ** 2) : POSEIDON_INPUTS
-
-        const out: bigint[] = [];
-        for (let childId = 0; childId < nPaddedChildren; childId += nChildren) {
-            const chunk = Array.from({ length: nChildren }, (_, localChildId) => arr[childId + localChildId] ?? 0n);
-            // Every word must be within the field [0, MOD)
-            // chunk.map(checkBLS12Modulus)
-            out.push(placeFunction(chunk));
-        }
-        return out;
-    };
-
-    // Repeatedly fold until a single word remains
-    let acc: bigint[] = fold(words)
-    while (acc.length > 1) acc = fold(acc)
-    return setLengthLeft(bigIntToBytes(acc[0]), 32);
+    let acc = poseidon_raw([words[0], words[1]]);
+    for (let i = 2; i < words.length; i++) {
+        acc = poseidon_raw([acc, words[i]]);
+    }
+    return setLengthLeft(bigIntToBytes(acc), 32);
 }
 
 export function poseidonN2xCompress(in_vals: bigint[]): bigint {
-  if (in_vals.length !== POSEIDON_INPUTS ** 2) {
-    throw new Error(`poseidon${POSEIDON_INPUTS} expected exactly ${POSEIDON_INPUTS ** 2} values`);
+  return poseidonChainCompress(in_vals, 2);
+}
+
+export function poseidonN3xCompress(in_vals: bigint[]): bigint {
+  return poseidonChainCompress(in_vals, 3);
+}
+
+export function poseidonN4xCompress(in_vals: bigint[]): bigint {
+  return poseidonChainCompress(in_vals, 4);
+}
+
+export function poseidonN5xCompress(in_vals: bigint[]): bigint {
+  return poseidonChainCompress(in_vals, 5);
+}
+
+export function poseidonN6xCompress(in_vals: bigint[]): bigint {
+  return poseidonChainCompress(in_vals, 6);
+}
+
+function poseidonChainCompress(in_vals: bigint[], nCalls: number): bigint {
+  const expectedLength = nCalls + 1;
+  if (in_vals.length !== expectedLength) {
+    throw new Error(`Expected exactly ${expectedLength} values, but got ${in_vals.length}`);
   }
 
-  const interim: bigint[] = [];
-  for (let k = 0; k < POSEIDON_INPUTS; k++) {
-    const children = in_vals.slice(k * POSEIDON_INPUTS, (k + 1) * POSEIDON_INPUTS);
-    interim.push(poseidon_raw(children));
+  let acc = poseidon_raw([in_vals[0], in_vals[1]]);
+  for (let i = 2; i < in_vals.length; i++) {
+    acc = poseidon_raw([acc, in_vals[i]]);
   }
-  return poseidon_raw(interim);
+  return acc;
 }
 
 
