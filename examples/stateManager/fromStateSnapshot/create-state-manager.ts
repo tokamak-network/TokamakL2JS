@@ -1,4 +1,4 @@
-// Usage: tsx examples/stateManager/fromStateSnapshot/create-state-manager.ts <snapshot.json> <entry-contract-address>
+// Usage: tsx examples/stateManager/fromStateSnapshot/create-state-manager.ts <snapshot.json>
 
 import { promises as fs } from 'fs';
 import { Common, Mainnet } from '@ethereumjs/common';
@@ -7,14 +7,8 @@ import {
   createTokamakL2StateManagerFromStateSnapshot,
   getEddsaPublicKey,
   poseidon,
+  type StateSnapshot,
 } from '../../../src/index.ts';
-
-type ExampleStateSnapshot = {
-  channelId: number;
-  stateRoots: string[];
-  storageAddresses: string[];
-  registeredKeys: { key: string; value: string }[][];
-};
 
 const createExampleCommon = (): Common => {
   return new Common({
@@ -27,23 +21,16 @@ const createExampleCommon = (): Common => {
 
 const main = async () => {
   const snapshotPath = process.argv[2];
-  const entryContractAddress = process.argv[3];
   if (!snapshotPath) {
     throw new Error(
-      'Snapshot file path is required. Usage: tsx examples/stateManager/fromStateSnapshot/create-state-manager.ts <snapshot.json> <entry-contract-address>'
-    );
-  }
-  if (!entryContractAddress) {
-    throw new Error(
-      'Entry contract address is required. Usage: tsx examples/stateManager/fromStateSnapshot/create-state-manager.ts <snapshot.json> <entry-contract-address>'
+      'Snapshot file path is required. Usage: tsx examples/stateManager/fromStateSnapshot/create-state-manager.ts <snapshot.json>'
     );
   }
 
-  const snapshot: ExampleStateSnapshot = JSON.parse(await fs.readFile(snapshotPath, 'utf8'));
+  const snapshot: StateSnapshot = JSON.parse(await fs.readFile(snapshotPath, 'utf8'));
 
   const stateManager = await createTokamakL2StateManagerFromStateSnapshot(snapshot, {
     common: createExampleCommon(),
-    entryContractAddress: createAddressFromString(entryContractAddress),
     storageAddresses: snapshot.storageAddresses.map((address) =>
       createAddressFromString(address)
     ),

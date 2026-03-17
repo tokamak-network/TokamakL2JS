@@ -23,7 +23,6 @@ export type contractCodeForAddress = {
 
 export type TokamakL2StateManagerOpts = {
     common: Common,
-    entryContractAddress: Address,
     initStorageKeys?: storageKeysForAddress[],
     storageAddresses?: Address[],
     blockNumber?: number,
