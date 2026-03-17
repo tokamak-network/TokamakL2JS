@@ -1,6 +1,6 @@
 {
   "name": "tokamak-l2js",
-  "version": "0.0.25",
+  "version": "0.0.26",
   "description": "TypeScript toolkit for Tokamak Network Layer-2 ZKP transactions, state management, and Poseidon/EDDSA cryptography.",
   "keywords": [
     "tokamak",
@@ -24,7 +24,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/tokamak-network/TokamakL2JS.git"
+    "url": "git+https://github.com/tokamak-network/TokamakL2JS.git"
   },
   "license": "MIT OR Apache-2.0",
   "author": "Tokamak Network",
