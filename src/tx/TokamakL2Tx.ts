@@ -1,11 +1,10 @@
-import { Address, bigIntToBytes, bytesToBigInt, setLengthLeft, bigIntToUnpaddedBytes, unpadBytes, concatBytes, equalsBytes, bytesToHex } from "@ethereumjs/util"
+import { Address, bigIntToBytes, bytesToBigInt, setLengthLeft, bigIntToUnpaddedBytes, unpadBytes, concatBytes, equalsBytes } from "@ethereumjs/util"
 import { LegacyTx, TransactionInterface, TransactionType, TxValuesArray as AllTypesTxValuesArray, createLegacyTx } from '@ethereumjs/tx'
 import { EthereumJSErrorWithoutCode, RLP } from "@ethereumjs/rlp"
 import { jubjub } from "@noble/curves/misc.js"
 import { EdwardsPoint } from "@noble/curves/abstract/edwards.js"
 import { eddsaSign, eddsaVerify, getEddsaPublicKey, poseidon } from "../crypto/index.js"
 import { FUNCTION_INPUT_LENGTH } from "../interface/params/index.js"
-import { TxSnapshot } from "../interface/channel/types.js"
 import { batchBigIntTo32BytesEach, fromEdwardsToAddress } from "../utils/index.js"
 import { createTokamakL2Tx } from "./constructors.js"
 
@@ -135,20 +134,6 @@ export class TokamakL2Tx extends LegacyTx implements TransactionInterface<typeof
             this.r !== undefined ? bigIntToUnpaddedBytes(this.r) : new Uint8Array(0),
             this.s !== undefined ? bigIntToUnpaddedBytes(this.s) : new Uint8Array(0),
         ]
-    }
-
-    captureTxSnapshot(): TxSnapshot {
-        const [nonce, to, data, senderPubKey, v, r, s] = this.raw()
-
-        return {
-            nonce: bytesToHex(nonce),
-            to: bytesToHex(to),
-            data: bytesToHex(data),
-            senderPubKey: bytesToHex(senderPubKey),
-            v: bytesToHex(v),
-            r: bytesToHex(r),
-            s: bytesToHex(s),
-        }
     }
 
     override serialize(): Uint8Array {
