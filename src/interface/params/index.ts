@@ -14,5 +14,5 @@ export const FUNCTION_INPUT_LENGTH = 29;
 
 // Params to feed QAP Compiler 
 export const POSEIDON_INPUTS = 2;
-export const MT_DEPTH = 10;
+export const MT_DEPTH = 12;
 export const MAX_MT_LEAVES = POSEIDON_INPUTS ** MT_DEPTH;
