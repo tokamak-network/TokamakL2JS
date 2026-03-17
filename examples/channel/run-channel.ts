@@ -109,7 +109,6 @@ const main = async () => {
   const common = createTokamakL2Common();
   const stateManager = await createTokamakL2StateManagerFromStateSnapshot(inputSnapshot, {
     common,
-    entryContractAddress: contractAddress,
     storageAddresses: inputSnapshot.storageAddresses.map((address) =>
       createAddressFromString(address)
     ),
