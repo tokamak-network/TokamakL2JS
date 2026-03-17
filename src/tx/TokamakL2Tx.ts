@@ -1,4 +1,4 @@
-import { Address, bigIntToBytes, bytesToBigInt, bytesToHex, setLengthLeft, bigIntToUnpaddedBytes, unpadBytes, concatBytes, equalsBytes } from "@ethereumjs/util"
+import { Address, bigIntToBytes, bigIntToHex, bytesToBigInt, bytesToHex, setLengthLeft, bigIntToUnpaddedBytes, unpadBytes, concatBytes, equalsBytes } from "@ethereumjs/util"
 import { LegacyTx, TransactionInterface, TransactionType, TxValuesArray as AllTypesTxValuesArray, createLegacyTx } from '@ethereumjs/tx'
 import { EthereumJSErrorWithoutCode, RLP } from "@ethereumjs/rlp"
 import { jubjub } from "@noble/curves/misc.js"
@@ -143,9 +143,9 @@ export class TokamakL2Tx extends LegacyTx implements TransactionInterface<typeof
             to: bytesToHex(this.to.bytes),
             data: bytesToHex(this.data),
             senderPubKey: bytesToHex(this.getSenderPublicKey()),
-            v: this.v === undefined ? undefined : bytesToHex(bigIntToUnpaddedBytes(this.v)),
-            r: this.r === undefined ? undefined : bytesToHex(bigIntToUnpaddedBytes(this.r)),
-            s: this.s === undefined ? undefined : bytesToHex(bigIntToUnpaddedBytes(this.s)),
+            v: this.v === undefined ? undefined : bigIntToHex(this.v),
+            r: this.r === undefined ? undefined : bigIntToHex(this.r),
+            s: this.s === undefined ? undefined : bigIntToHex(this.s),
         }
     }
 
