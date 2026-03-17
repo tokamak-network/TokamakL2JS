@@ -53,17 +53,28 @@ export function createTokamakL2TxFromSnapshot(
   snapshot: TxSnapshot,
   opts: TxOptions,
 ): TokamakL2Tx {
-  const values = [
-    bigIntToUnpaddedBytes(BigInt(snapshot.nonce)),
-    hexToBytes(addHexPrefix(snapshot.to)),
-    hexToBytes(addHexPrefix(snapshot.data)),
-    hexToBytes(addHexPrefix(snapshot.senderPubKey)),
-    snapshot.v === undefined ? new Uint8Array(0) : hexToBytes(addHexPrefix(snapshot.v)),
-    snapshot.r === undefined ? new Uint8Array(0) : hexToBytes(addHexPrefix(snapshot.r)),
-    snapshot.s === undefined ? new Uint8Array(0) : hexToBytes(addHexPrefix(snapshot.s)),
-  ]
+  const nonce = bigIntToUnpaddedBytes(BigInt(snapshot.nonce))
+  const to = hexToBytes(addHexPrefix(snapshot.to))
+  const data = hexToBytes(addHexPrefix(snapshot.data))
+  const senderPubKey = hexToBytes(addHexPrefix(snapshot.senderPubKey))
+  const v = snapshot.v === undefined ? new Uint8Array(0) : hexToBytes(addHexPrefix(snapshot.v))
+  const r = snapshot.r === undefined ? new Uint8Array(0) : hexToBytes(addHexPrefix(snapshot.r))
+  const s = snapshot.s === undefined ? new Uint8Array(0) : hexToBytes(addHexPrefix(snapshot.s))
 
-  return createTokamakL2TxFromBytesArray(values, opts)
+  const txDataRaw = { nonce, to, data, senderPubKey, v, r, s }
+  validateNoLeadingZeroes(txDataRaw)
+
+  const txDataFormat: TokamakL2TxData = {
+    nonce: bytesToBigInt(nonce),
+    to: new Address(to),
+    data,
+    senderPubKey,
+    v: v.length === 0 ? undefined : bytesToBigInt(v),
+    r: r.length === 0 ? undefined : bytesToBigInt(r),
+    s: s.length === 0 ? undefined : bytesToBigInt(s),
+  }
+
+  return createTokamakL2Tx(txDataFormat, opts)
 }
 
 /**
