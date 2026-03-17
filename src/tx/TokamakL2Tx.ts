@@ -138,16 +138,14 @@ export class TokamakL2Tx extends LegacyTx implements TransactionInterface<typeof
     }
 
     captureTxSnapshot(): TxSnapshot {
-        const [nonce, to, data, senderPubKey, v, r, s] = this.raw()
-
         return {
-            nonce: bytesToHex(nonce),
-            to: bytesToHex(to),
-            data: bytesToHex(data),
-            senderPubKey: bytesToHex(senderPubKey),
-            ...(v.length === 0 ? {} : { v: bytesToHex(v) }),
-            ...(r.length === 0 ? {} : { r: bytesToHex(r) }),
-            ...(s.length === 0 ? {} : { s: bytesToHex(s) }),
+            nonce: bytesToHex(bigIntToUnpaddedBytes(this.nonce)),
+            to: bytesToHex(this.to.bytes),
+            data: bytesToHex(this.data),
+            senderPubKey: bytesToHex(this.getSenderPublicKey()),
+            ...(this.v === undefined ? {} : { v: bytesToHex(bigIntToUnpaddedBytes(this.v)) }),
+            ...(this.r === undefined ? {} : { r: bytesToHex(bigIntToUnpaddedBytes(this.r)) }),
+            ...(this.s === undefined ? {} : { s: bytesToHex(bigIntToUnpaddedBytes(this.s)) }),
         }
     }
 
