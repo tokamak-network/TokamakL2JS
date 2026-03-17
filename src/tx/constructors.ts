@@ -2,7 +2,7 @@ import { TxOptions } from "@ethereumjs/tx"
 import { TokamakL2Tx } from "./TokamakL2Tx.js"
 import { TokamakL2TxData } from "./types.js"
 import { EthereumJSErrorWithoutCode, RLP } from "@ethereumjs/rlp"
-import { Address, addHexPrefix, bigIntToUnpaddedBytes, bytesToBigInt, hexToBytes, validateNoLeadingZeroes } from "@ethereumjs/util"
+import { Address, addHexPrefix, bytesToBigInt, hexToBytes, validateNoLeadingZeroes } from "@ethereumjs/util"
 import { ANY_LARGE_GAS_LIMIT, ANY_LARGE_GAS_PRICE } from "../interface/params/index.js"
 import { TxSnapshot } from "../interface/channel/types.js"
 
@@ -53,25 +53,18 @@ export function createTokamakL2TxFromSnapshot(
   snapshot: TxSnapshot,
   opts: TxOptions,
 ): TokamakL2Tx {
-  const nonce = bigIntToUnpaddedBytes(BigInt(snapshot.nonce))
-  const to = hexToBytes(addHexPrefix(snapshot.to))
-  const data = hexToBytes(addHexPrefix(snapshot.data))
-  const senderPubKey = hexToBytes(addHexPrefix(snapshot.senderPubKey))
-  const v = snapshot.v === undefined ? new Uint8Array(0) : hexToBytes(addHexPrefix(snapshot.v))
-  const r = snapshot.r === undefined ? new Uint8Array(0) : hexToBytes(addHexPrefix(snapshot.r))
-  const s = snapshot.s === undefined ? new Uint8Array(0) : hexToBytes(addHexPrefix(snapshot.s))
-
-  const txDataFormat: TokamakL2TxData = {
-    nonce: bytesToBigInt(nonce),
-    to: new Address(to),
-    data,
-    senderPubKey,
-    v: v.length === 0 ? undefined : bytesToBigInt(v),
-    r: r.length === 0 ? undefined : bytesToBigInt(r),
-    s: s.length === 0 ? undefined : bytesToBigInt(s),
-  }
-
-  return createTokamakL2Tx(txDataFormat, opts)
+  return createTokamakL2Tx(
+    {
+      nonce: BigInt(snapshot.nonce),
+      to: new Address(hexToBytes(addHexPrefix(snapshot.to))),
+      data: hexToBytes(addHexPrefix(snapshot.data)),
+      senderPubKey: hexToBytes(addHexPrefix(snapshot.senderPubKey)),
+      v: snapshot.v === undefined ? undefined : BigInt(snapshot.v),
+      r: snapshot.r === undefined ? undefined : BigInt(snapshot.r),
+      s: snapshot.s === undefined ? undefined : BigInt(snapshot.s),
+    },
+    opts,
+  )
 }
 
 /**
