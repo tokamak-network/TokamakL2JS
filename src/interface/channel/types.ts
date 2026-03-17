@@ -10,7 +10,7 @@ export type TxSnapshot = {
   to: string;
   data: string;
   senderPubKey: string;
-  v: string;
-  r: string;
-  s: string;
+  v?: string;
+  r?: string;
+  s?: string;
 }

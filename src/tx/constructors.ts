@@ -41,9 +41,9 @@ export function createTokamakL2TxFromBytesArray(values: Uint8Array[], opts: TxOp
     to: new Address(to),
     data,
     senderPubKey,
-    v: bytesToBigInt(v),
-    r: bytesToBigInt(r),
-    s: bytesToBigInt(s),
+    v: v.length === 0 ? undefined : bytesToBigInt(v),
+    r: r.length === 0 ? undefined : bytesToBigInt(r),
+    s: s.length === 0 ? undefined : bytesToBigInt(s),
   }
 
   return createTokamakL2Tx(txDataFormat, opts)
@@ -58,9 +58,9 @@ export function createTokamakL2TxFromSnapshot(
     hexToBytes(addHexPrefix(snapshot.to)),
     hexToBytes(addHexPrefix(snapshot.data)),
     hexToBytes(addHexPrefix(snapshot.senderPubKey)),
-    hexToBytes(addHexPrefix(snapshot.v)),
-    hexToBytes(addHexPrefix(snapshot.r)),
-    hexToBytes(addHexPrefix(snapshot.s)),
+    snapshot.v === undefined ? new Uint8Array(0) : hexToBytes(addHexPrefix(snapshot.v)),
+    snapshot.r === undefined ? new Uint8Array(0) : hexToBytes(addHexPrefix(snapshot.r)),
+    snapshot.s === undefined ? new Uint8Array(0) : hexToBytes(addHexPrefix(snapshot.s)),
   ]
 
   return createTokamakL2TxFromBytesArray(values, opts)
