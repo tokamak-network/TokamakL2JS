@@ -143,9 +143,9 @@ export class TokamakL2Tx extends LegacyTx implements TransactionInterface<typeof
             to: bytesToHex(this.to.bytes),
             data: bytesToHex(this.data),
             senderPubKey: bytesToHex(this.getSenderPublicKey()),
-            ...(this.v === undefined ? {} : { v: bytesToHex(bigIntToUnpaddedBytes(this.v)) }),
-            ...(this.r === undefined ? {} : { r: bytesToHex(bigIntToUnpaddedBytes(this.r)) }),
-            ...(this.s === undefined ? {} : { s: bytesToHex(bigIntToUnpaddedBytes(this.s)) }),
+            v: this.v === undefined ? undefined : bytesToHex(bigIntToUnpaddedBytes(this.v)),
+            r: this.r === undefined ? undefined : bytesToHex(bigIntToUnpaddedBytes(this.r)),
+            s: this.s === undefined ? undefined : bytesToHex(bigIntToUnpaddedBytes(this.s)),
         }
     }
 
