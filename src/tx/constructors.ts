@@ -4,7 +4,7 @@ import { TokamakL2TxData } from "./types.js"
 import { EthereumJSErrorWithoutCode, RLP } from "@ethereumjs/rlp"
 import { Address, bytesToBigInt, hexToBytes, validateNoLeadingZeroes } from "@ethereumjs/util"
 import { ANY_LARGE_GAS_LIMIT, ANY_LARGE_GAS_PRICE } from "../interface/params/index.js"
-import { TransactionSnapshot } from "../interface/channel/types.js"
+import { TxSnapshot } from "../interface/channel/types.js"
 
 
 export function createTokamakL2Tx(txData: TokamakL2TxData, opts: TxOptions): TokamakL2Tx {
@@ -50,7 +50,7 @@ export function createTokamakL2TxFromBytesArray(values: Uint8Array[], opts: TxOp
 }
 
 export function createTokamakL2TxFromSnapshot(
-  snapshot: TransactionSnapshot,
+  snapshot: TxSnapshot,
   opts: TxOptions,
 ): TokamakL2Tx {
   const values = [

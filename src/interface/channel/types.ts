@@ -5,7 +5,7 @@ export type StateSnapshot = {
   channelId: number;
 }
 
-export type TransactionSnapshot = {
+export type TxSnapshot = {
   nonce: string;
   to: string;
   data: string;
