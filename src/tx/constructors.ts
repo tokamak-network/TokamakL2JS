@@ -1,9 +1,10 @@
-import { TxOptions, TxValuesArray } from "@ethereumjs/tx"
+import { TxOptions } from "@ethereumjs/tx"
 import { TokamakL2Tx } from "./TokamakL2Tx.js"
 import { TokamakL2TxData } from "./types.js"
 import { EthereumJSErrorWithoutCode, RLP } from "@ethereumjs/rlp"
-import { Address, bytesToBigInt, bytesToHex, toBytes, validateNoLeadingZeroes } from "@ethereumjs/util"
+import { Address, bytesToBigInt, hexToBytes, validateNoLeadingZeroes } from "@ethereumjs/util"
 import { ANY_LARGE_GAS_LIMIT, ANY_LARGE_GAS_PRICE } from "../interface/params/index.js"
+import { TransactionSnapshot } from "../interface/channel/types.js"
 
 
 export function createTokamakL2Tx(txData: TokamakL2TxData, opts: TxOptions): TokamakL2Tx {
@@ -21,7 +22,7 @@ export function createTokamakL2Tx(txData: TokamakL2TxData, opts: TxOptions): Tok
 /**
  * Create a transaction from an array of byte encoded values ordered according to the devp2p network encoding - format noted below.
  *
- * Format: `[nonce, gasPrice, gasLimit, to, value, data, v, r, s]`
+ * Format: `[nonce, to, data, senderPubKey, v, r, s]`
  */
 export function createTokamakL2TxFromBytesArray(values: Uint8Array[], opts: TxOptions): TokamakL2Tx {
   if ( values.length !== 7 ) {
@@ -48,11 +49,27 @@ export function createTokamakL2TxFromBytesArray(values: Uint8Array[], opts: TxOp
   return createTokamakL2Tx(txDataFormat, opts)
 }
 
+export function createTokamakL2TxFromSnapshot(
+  snapshot: TransactionSnapshot,
+  opts: TxOptions,
+): TokamakL2Tx {
+  const values = [
+    hexToBytes(snapshot.nonce),
+    hexToBytes(snapshot.to),
+    hexToBytes(snapshot.data),
+    hexToBytes(snapshot.senderPubKey),
+    hexToBytes(snapshot.v),
+    hexToBytes(snapshot.r),
+    hexToBytes(snapshot.s),
+  ]
+
+  return createTokamakL2TxFromBytesArray(values, opts)
+}
+
 /**
  * Instantiate a transaction from a RLP serialized tx.
  *
- * Format: `rlp([nonce, gasPrice, gasLimit, to, value, data,
- * signatureV, signatureR, signatureS])`
+ * Format: `rlp([nonce, to, data, senderPubKey, v, r, s])`
  */
 export function createTokamakL2TxFromRLP(serialized: Uint8Array, opts: TxOptions): TokamakL2Tx {
   const values = RLP.decode(serialized)

@@ -4,3 +4,13 @@ export type StateSnapshot = {
   registeredKeys: { key: string; value: string }[][];
   channelId: number;
 }
+
+export type TransactionSnapshot = {
+  nonce: string;
+  to: string;
+  data: string;
+  senderPubKey: string;
+  v: string;
+  r: string;
+  s: string;
+}
