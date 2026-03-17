@@ -1,4 +1,4 @@
-// Usage: tsx examples/stateManager/fromStateSnapshot/create-state-manager.ts <snapshot.json>
+// Usage: tsx examples/stateManager/fromStateSnapshot/create-state-manager.ts <snapshot.json> <entry-contract-address>
 
 import { promises as fs } from 'fs';
 import { Common, Mainnet } from '@ethereumjs/common';
@@ -14,7 +14,6 @@ type ExampleStateSnapshot = {
   stateRoots: string[];
   storageAddresses: string[];
   registeredKeys: { key: string; value: string }[][];
-  entryContractAddress: string;
 };
 
 const createExampleCommon = (): Common => {
@@ -28,9 +27,15 @@ const createExampleCommon = (): Common => {
 
 const main = async () => {
   const snapshotPath = process.argv[2];
+  const entryContractAddress = process.argv[3];
   if (!snapshotPath) {
     throw new Error(
-      'Snapshot file path is required. Usage: tsx examples/stateManager/fromStateSnapshot/create-state-manager.ts <snapshot.json>'
+      'Snapshot file path is required. Usage: tsx examples/stateManager/fromStateSnapshot/create-state-manager.ts <snapshot.json> <entry-contract-address>'
+    );
+  }
+  if (!entryContractAddress) {
+    throw new Error(
+      'Entry contract address is required. Usage: tsx examples/stateManager/fromStateSnapshot/create-state-manager.ts <snapshot.json> <entry-contract-address>'
     );
   }
 
@@ -38,7 +43,7 @@ const main = async () => {
 
   const stateManager = await createTokamakL2StateManagerFromStateSnapshot(snapshot, {
     common: createExampleCommon(),
-    entryContractAddress: createAddressFromString(snapshot.entryContractAddress),
+    entryContractAddress: createAddressFromString(entryContractAddress),
     storageAddresses: snapshot.storageAddresses.map((address) =>
       createAddressFromString(address)
     ),

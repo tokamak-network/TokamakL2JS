@@ -33,8 +33,6 @@ assert(Array.isArray(snapshot.storageAddresses), 'storageAddresses must be an ar
 assert(Array.isArray(snapshot.registeredKeys), 'registeredKeys must be an array', failures)
 assert(Array.isArray(snapshot.storageEntries), 'storageEntries must be an array', failures)
 assert(Array.isArray(snapshot.preAllocatedLeaves), 'preAllocatedLeaves must be an array', failures)
-assert(typeof snapshot.entryContractAddress === 'string', 'entryContractAddress must be a string', failures)
-
 if (failures.length > 0) {
   console.error('Snapshot validation failed:')
   for (const f of failures) console.error(`- ${f}`)
@@ -52,8 +50,6 @@ const sameLength = lengths.every((v) => v === lengths[0])
 assert(sameLength, 'stateRoots/storageAddresses/registeredKeys/storageEntries/preAllocatedLeaves length mismatch', failures)
 
 assert(isHexAllowEmpty(snapshot.channelId), 'channelId must be 0x-prefixed hex string', failures)
-assert(isHex(snapshot.entryContractAddress), 'entryContractAddress must be 0x-prefixed non-empty hex string', failures)
-
 const addressSet = new Set()
 for (let i = 0; i < snapshot.storageAddresses.length; i++) {
   const address = snapshot.storageAddresses[i]

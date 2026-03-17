@@ -270,10 +270,6 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
     public get cachedOpts() {return this._cachedOpts}
 
     public async captureStateSnapshot(prevSnapshot: StateSnapshot): Promise<StateSnapshot> {
-        const entryContractAddress = this.cachedOpts!.entryContractAddress;
-        if (hexToBigInt(addHexPrefix(prevSnapshot.entryContractAddress)) !==  bytesToBigInt(entryContractAddress.bytes)) {
-            throw new Error ('Mismatch between contract addresses of the previous state snapshot and the current state.')
-        }
         if (this.registeredKeys === null) {
             throw new Error('Registered storage keys are not initialized.')
         }
@@ -325,7 +321,6 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             stateRoots,
             storageAddresses: [...prevSnapshot.storageAddresses],
             registeredKeys,
-            entryContractAddress: prevSnapshot.entryContractAddress,
         };
     }
 }

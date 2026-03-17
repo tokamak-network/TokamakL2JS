@@ -118,17 +118,10 @@ const main = async () => {
   if (!hasSelectorPrefix(transactionConfig.calldata, transactionConfig.function.selector)) {
     throw new Error('transactionConfig.calldata must start with transactionConfig.function.selector');
   }
-  const entryContractAddress = createAddressFromString(inputSnapshot.entryContractAddress);
-  if (!entryContractAddress.equals(contractAddress)) {
-    throw new Error(
-      `The snapshot entry contract address (${entryContractAddress.toString()}) must match the transaction config (${contractAddress.toString()}).`
-    );
-  }
-
   const common = getCommonForNetwork(transactionConfig.network);
   const stateManager = await createTokamakL2StateManagerFromStateSnapshot(inputSnapshot, {
     common,
-    entryContractAddress,
+    entryContractAddress: contractAddress,
     storageAddresses: inputSnapshot.storageAddresses.map((address) =>
       createAddressFromString(address)
     ),
