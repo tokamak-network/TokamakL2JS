@@ -61,9 +61,6 @@ export function createTokamakL2TxFromSnapshot(
   const r = snapshot.r === undefined ? new Uint8Array(0) : hexToBytes(addHexPrefix(snapshot.r))
   const s = snapshot.s === undefined ? new Uint8Array(0) : hexToBytes(addHexPrefix(snapshot.s))
 
-  const txDataRaw = { nonce, to, data, senderPubKey, v, r, s }
-  validateNoLeadingZeroes(txDataRaw)
-
   const txDataFormat: TokamakL2TxData = {
     nonce: bytesToBigInt(nonce),
     to: new Address(to),
