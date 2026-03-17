@@ -28,7 +28,7 @@ npm run build
 ## Reporting
 
 Capture:
-- changed files under `src/stateManager/` and `src/interface/stateSnapshot/`
+- changed files under `src/stateManager/` and `src/interface/channel/`
 - guard script result
 - snapshot validator result
 - build result and final gate decision

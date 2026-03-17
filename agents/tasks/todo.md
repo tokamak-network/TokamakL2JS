@@ -233,7 +233,7 @@
 - Added consistency checks for snapshot array lengths and uninitialized registered keys.
 - Validation run: `npm run build` failed due to pre-existing unrelated errors:
   - `src/interface/configuration/utils.ts`: `contractAddress` should be `entryContractAddress`.
-  - `src/stateManager/constructors.ts`: imports `StateSnapshot` from `./types.js`, but it is exported from `src/interface/stateSnapshot/types.ts`.
+  - `src/stateManager/constructors.ts`: imports `StateSnapshot` from `./types.js`, but it is exported from `src/interface/channel/types.ts`.
 
 ## Task: Deduplicate `safeConversion` into shared utility
 
@@ -249,7 +249,7 @@
 - Removed now-unneeded imports (`bigIntToBytes`, `toBytes`) from `src/stateManager/TokamakL2StateManager.ts`.
 - Validation run: `npm run build` still fails only on pre-existing unrelated errors:
   - `src/interface/configuration/utils.ts`: `contractAddress` should be `entryContractAddress`.
-  - `src/stateManager/constructors.ts`: imports `StateSnapshot` from `./types.js`, but it is exported from `src/interface/stateSnapshot/types.ts`.
+  - `src/stateManager/constructors.ts`: imports `StateSnapshot` from `./types.js`, but it is exported from `src/interface/channel/types.ts`.
 
 ## Task: Align fromRPC example config with `ChannelStateConfig`
 

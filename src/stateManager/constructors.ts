@@ -1,7 +1,7 @@
 import { TokamakL2StateManagerOpts } from "./types.js";
 import { TokamakL2StateManager } from "./TokamakL2StateManager.js";
 import { MAX_MT_LEAVES } from "../interface/params/index.js";
-import { StateSnapshot } from "../interface/stateSnapshot/types.js";
+import { StateSnapshot } from "../interface/channel/types.js";
 
 export async function createTokamakL2StateManagerFromL1RPC(
     rpcUrl: string,
