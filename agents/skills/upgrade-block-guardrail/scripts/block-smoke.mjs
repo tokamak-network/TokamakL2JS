@@ -1,13 +1,11 @@
 #!/usr/bin/env node
 
-import { Common, Mainnet } from '@ethereumjs/common'
 import { bytesToHex, concatBytes, createAddressFromString, hexToBytes, setLengthLeft } from '@ethereumjs/util'
 import {
+  createTokamakL2Common,
   createTokamakL2Block,
   deriveL2KeysFromSignature,
   fromEdwardsToAddress,
-  getEddsaPublicKey,
-  poseidon,
 } from '../../../../dist/index.js'
 
 const EXPECTED_HASH = '0x50e738df075573f99d0d90be6da84e6f7b70871b9359b1988260011ef775f765'
@@ -49,10 +47,7 @@ try {
 }
 assert(missingCryptoRejected, 'Block constructor must reject missing common.customCrypto')
 
-const common = new Common({
-  chain: { ...Mainnet },
-  customCrypto: { keccak256: poseidon, ecrecover: getEddsaPublicKey },
-})
+const common = createTokamakL2Common()
 
 const block = createTokamakL2Block(
   {

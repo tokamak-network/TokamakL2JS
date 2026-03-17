@@ -1,4 +1,3 @@
-import { Common, type CommonOpts, Mainnet, Sepolia } from "@ethereumjs/common";
 import {
   bytesToHex,
   createAddressFromString,
@@ -7,7 +6,7 @@ import {
   utf8ToBytes,
 } from "@ethereumjs/util";
 import { jubjub } from "@noble/curves/misc.js";
-import { getEddsaPublicKey, poseidon } from "../../crypto/index.js";
+import { createTokamakL2Common } from "../../common/index.js";
 import {
   storageKeysForAddress,
   TokamakL2StateManagerOpts,
@@ -56,13 +55,7 @@ export function createStateManagerOptsFromChannelConfig(
     });
   }
 
-  const commonOpts: CommonOpts = {
-    chain: {
-      ...Mainnet,
-    },
-    customCrypto: { keccak256: poseidon, ecrecover: getEddsaPublicKey },
-  };
-  const common = new Common(commonOpts);
+  const common = createTokamakL2Common();
 
   return {
     common,

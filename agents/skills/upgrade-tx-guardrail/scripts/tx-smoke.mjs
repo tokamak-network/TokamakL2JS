@@ -1,14 +1,12 @@
 #!/usr/bin/env node
 
-import { Common, Mainnet } from '@ethereumjs/common'
 import { bytesToHex, concatBytes, createAddressFromString, hexToBytes, setLengthLeft } from '@ethereumjs/util'
 import {
+  createTokamakL2Common,
   createTokamakL2Tx,
   createTokamakL2TxFromRLP,
   deriveL2KeysFromSignature,
   fromEdwardsToAddress,
-  getEddsaPublicKey,
-  poseidon,
 } from '../../../../dist/index.js'
 
 const EXPECTED_SERIALIZED_HEX = '0xf8c001943333333333333333333333333333333333333333b844a9059cbb000000000000000000000000e531179ef748fe9fc10b699cbbece0c35f21f5ee000000000000000000000000000000000000000000000000000000000000002aa04973750aaa85b6007a858b1547881b91bcb204a5287a9e105ee6e5fc4db969bd1ba07e4680c83b0c27f47cd6895f4c42e69b811432ea9356b9f570a27fa7d1be6d9ca00bb3a60cec01fc54017a2fea359280e3ccd8b93744a632e5f8a0547a5c6cdca7'
@@ -33,10 +31,7 @@ const callData = concatBytes(
   setLengthLeft(hexToBytes('0x2a'), 32),
 )
 
-const common = new Common({
-  chain: { ...Mainnet },
-  customCrypto: { keccak256: poseidon, ecrecover: getEddsaPublicKey },
-})
+const common = createTokamakL2Common()
 
 const unsignedTx = createTokamakL2Tx(
   {

@@ -1,6 +1,7 @@
 export * from './crypto/index.js'
 export * from './tx/index.js'
 export * from './block/index.js'
+export * from './common/index.js'
 export * from './stateManager/index.js'
 export * from './interface/configuration/types.js'
 export * from './interface/channel/types.js'

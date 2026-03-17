@@ -1,7 +1,6 @@
 // Usage: tsx examples/channel/run-channel.ts [input-state-snapshot.json] [transaction-config.json] [block-info.json] [contract-code.json] [output-state-snapshot.json]
 
 import { promises as fs } from 'fs';
-import { Common, Mainnet, Sepolia } from '@ethereumjs/common';
 import { createBlock } from '@ethereumjs/block';
 import { createVM, runTx } from '@ethereumjs/vm';
 import {
@@ -18,13 +17,12 @@ import {
 } from '@ethereumjs/util';
 import { jubjub } from '@noble/curves/misc.js';
 import {
+  createTokamakL2Common,
   createTokamakL2StateManagerFromStateSnapshot,
   createTokamakL2Tx,
   deriveL2KeysFromSignature,
   fromEdwardsToAddress,
-  getEddsaPublicKey,
   getUserStorageKey,
-  poseidon,
   type StateSnapshot,
 } from '../../src/index.ts';
 
@@ -58,16 +56,6 @@ const DEFAULT_TX_CONFIG_PATH = new URL('./transaction-config.json', DEFAULT_CONF
 const DEFAULT_BLOCK_INFO_PATH = new URL('./block-info.json', DEFAULT_CONFIG_DIR);
 const DEFAULT_CONTRACT_CODE_PATH = new URL('./contract-code.json', DEFAULT_CONFIG_DIR);
 const DEFAULT_OUTPUT_PATH = new URL('./output-state-snapshot.json', DEFAULT_CONFIG_DIR);
-
-const getCommonForNetwork = (network: ChannelTransactionConfig['network']): Common => {
-  const chain = network === 'sepolia' ? Sepolia : Mainnet;
-  return new Common({
-    chain: {
-      ...chain,
-    },
-    customCrypto: { keccak256: poseidon, ecrecover: getEddsaPublicKey },
-  });
-};
 
 const toSeedBytes = (seed: string) => setLengthLeft(utf8ToBytes(seed), 32);
 
@@ -118,7 +106,7 @@ const main = async () => {
   if (!hasSelectorPrefix(transactionConfig.calldata, transactionConfig.function.selector)) {
     throw new Error('transactionConfig.calldata must start with transactionConfig.function.selector');
   }
-  const common = getCommonForNetwork(transactionConfig.network);
+  const common = createTokamakL2Common();
   const stateManager = await createTokamakL2StateManagerFromStateSnapshot(inputSnapshot, {
     common,
     entryContractAddress: contractAddress,

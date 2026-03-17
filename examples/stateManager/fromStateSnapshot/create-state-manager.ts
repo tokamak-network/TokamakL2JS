@@ -1,23 +1,12 @@
 // Usage: tsx examples/stateManager/fromStateSnapshot/create-state-manager.ts <snapshot.json>
 
 import { promises as fs } from 'fs';
-import { Common, Mainnet } from '@ethereumjs/common';
 import { bigIntToHex, createAddressFromString } from '@ethereumjs/util';
 import {
+  createTokamakL2Common,
   createTokamakL2StateManagerFromStateSnapshot,
-  getEddsaPublicKey,
-  poseidon,
   type StateSnapshot,
 } from '../../../src/index.ts';
-
-const createExampleCommon = (): Common => {
-  return new Common({
-    chain: {
-      ...Mainnet,
-    },
-    customCrypto: { keccak256: poseidon, ecrecover: getEddsaPublicKey },
-  });
-};
 
 const main = async () => {
   const snapshotPath = process.argv[2];
@@ -30,7 +19,7 @@ const main = async () => {
   const snapshot: StateSnapshot = JSON.parse(await fs.readFile(snapshotPath, 'utf8'));
 
   const stateManager = await createTokamakL2StateManagerFromStateSnapshot(snapshot, {
-    common: createExampleCommon(),
+    common: createTokamakL2Common(),
     storageAddresses: snapshot.storageAddresses.map((address) =>
       createAddressFromString(address)
     ),

@@ -1,7 +1,6 @@
 // Usage: tsx examples/create-tx.ts <config.json>
 
 import { promises as fs } from 'fs';
-import { Common, CommonOpts, Mainnet } from '@ethereumjs/common';
 import {
   bytesToHex,
   createAddressFromString,
@@ -11,10 +10,9 @@ import {
 } from '@ethereumjs/util';
 import { jubjub } from '@noble/curves/misc.js';
 import {
+  createTokamakL2Common,
   createTokamakL2Tx,
   deriveL2KeysFromSignature,
-  getEddsaPublicKey,
-  poseidon,
   TokamakL2TxData,
 } from '../../src/index.js';
 
@@ -46,13 +44,7 @@ const main = async () => {
   const senderSignature = bytesToHex(jubjub.utils.randomPrivateKey(toSeedBytes(config.senderSeed)));
   const senderKeys = deriveL2KeysFromSignature(senderSignature);
 
-  const commonOpts: CommonOpts = {
-    chain: {
-      ...Mainnet,
-    },
-    customCrypto: { keccak256: poseidon, ecrecover: getEddsaPublicKey },
-  };
-  const common = new Common(commonOpts);
+  const common = createTokamakL2Common();
 
   const txData: TokamakL2TxData = {
     nonce: config.txNonce,
