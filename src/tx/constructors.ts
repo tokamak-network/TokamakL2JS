@@ -2,7 +2,7 @@ import { TxOptions } from "@ethereumjs/tx"
 import { TokamakL2Tx } from "./TokamakL2Tx.js"
 import { TokamakL2TxData } from "./types.js"
 import { EthereumJSErrorWithoutCode, RLP } from "@ethereumjs/rlp"
-import { Address, bytesToBigInt, hexToBytes, validateNoLeadingZeroes } from "@ethereumjs/util"
+import { Address, addHexPrefix, bytesToBigInt, hexToBytes, validateNoLeadingZeroes } from "@ethereumjs/util"
 import { ANY_LARGE_GAS_LIMIT, ANY_LARGE_GAS_PRICE } from "../interface/params/index.js"
 import { TxSnapshot } from "../interface/channel/types.js"
 
@@ -54,13 +54,13 @@ export function createTokamakL2TxFromSnapshot(
   opts: TxOptions,
 ): TokamakL2Tx {
   const values = [
-    hexToBytes(snapshot.nonce),
-    hexToBytes(snapshot.to),
-    hexToBytes(snapshot.data),
-    hexToBytes(snapshot.senderPubKey),
-    hexToBytes(snapshot.v),
-    hexToBytes(snapshot.r),
-    hexToBytes(snapshot.s),
+    hexToBytes(addHexPrefix(snapshot.nonce)),
+    hexToBytes(addHexPrefix(snapshot.to)),
+    hexToBytes(addHexPrefix(snapshot.data)),
+    hexToBytes(addHexPrefix(snapshot.senderPubKey)),
+    hexToBytes(addHexPrefix(snapshot.v)),
+    hexToBytes(addHexPrefix(snapshot.r)),
+    hexToBytes(addHexPrefix(snapshot.s)),
   ]
 
   return createTokamakL2TxFromBytesArray(values, opts)
