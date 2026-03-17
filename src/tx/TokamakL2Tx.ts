@@ -139,7 +139,7 @@ export class TokamakL2Tx extends LegacyTx implements TransactionInterface<typeof
 
     captureTxSnapshot(): TxSnapshot {
         return {
-            nonce: bytesToHex(bigIntToUnpaddedBytes(this.nonce)),
+            nonce: Number(this.nonce),
             to: bytesToHex(this.to.bytes),
             data: bytesToHex(this.data),
             senderPubKey: bytesToHex(this.getSenderPublicKey()),

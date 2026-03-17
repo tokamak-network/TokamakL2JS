@@ -6,7 +6,7 @@ export type StateSnapshot = {
 }
 
 export type TxSnapshot = {
-  nonce: string;
+  nonce: number;
   to: string;
   data: string;
   senderPubKey: string;
