@@ -2,10 +2,6 @@ import { Common } from "@ethereumjs/common";
 import { Address } from "@ethereumjs/util";
 
 export type MerkleTreeMembers = Map<bigint, Map<bigint, bigint>>;
-export type TrackedStorageKeysForAddress = {
-    address: Address,
-    keys: Map<bigint, `0x${string}`>,
-};
 
 export type storageKeysForAddress = {
     address: Address,
