@@ -231,17 +231,6 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         }
         return this._lastMerkleTrees
     }
-    public getMerkleTreeLeafIndex(address: Address, key: bigint): [number, number] {
-        const addressIndex = Array.from(this.registeredKeys.keys()).findIndex((registeredAddress) => registeredAddress === bytesToBigInt(address.bytes));
-        if (addressIndex === -1) {
-            return [-1, -1];
-        }
-        const registeredKeysForAddress = Array.from(this.registeredKeys.values())[addressIndex];
-        const leafIndex = registeredKeysForAddress.findIndex(
-            register => register === key
-          )
-        return [addressIndex, leafIndex]
-    }
     public get cachedOpts() {return this._cachedOpts}
 
     public async captureStateSnapshot(prevSnapshot: StateSnapshot): Promise<StateSnapshot> {
@@ -333,12 +322,12 @@ export class TokamakL2MerkleTrees {
         return this.merkleTrees.map((tree) => tree.root as bigint);
     }
 
-    public getProof(treeIndex: [number, number]): MerkleProof {
-        const key = Array.from(this._cachedTokamakL2StateManager?.registeredKeys?.values() ?? [])[treeIndex[0]]?.keys()?.toArray?.()?.[treeIndex[1]]
-        if (key === undefined) {
-            throw new Error(`Merkle tree proof target is not registered: [${treeIndex[0]}, ${treeIndex[1]}]`);
+    public getProof(treeIndex: [number, bigint]): MerkleProof {
+        const tree = this.merkleTrees[treeIndex[0]];
+        if (tree === undefined) {
+            throw new Error(`Merkle tree is not registered: ${treeIndex[0]}`);
         }
-        return this.merkleTrees[treeIndex[0]].createProof(key) as MerkleProof;
+        return tree.createProof(treeIndex[1]) as MerkleProof;
     }
 
     public static async buildFromTokamakL2StateManager(mpt: TokamakL2StateManager): Promise<TokamakL2MerkleTrees> {
