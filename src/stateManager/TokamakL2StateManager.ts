@@ -10,7 +10,7 @@ import { StateSnapshot } from "../interface/channel/types.js";
 
 export class TokamakL2StateManager extends MerkleStateManager implements StateManagerInterface {
     private _cachedOpts: TokamakL2StateManagerOpts | null = null
-    private _registeredKeys: MerkleTreeMembers | null = null
+    private _registeredMembers: MerkleTreeMembers | null = null
     private _lastMerkleTrees: TokamakL2MerkleTrees | null = null
 
     public async initTokamakExtendsFromRPC(rpcUrl: string, opts: TokamakL2StateManagerOpts): Promise<void> {
@@ -71,17 +71,17 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         if (opts.initStorageKeys === undefined) {
             throw new Error('Creating TokamakL2StateManager from RPC requires L1 and L2 key pairs.')
         }
-        if (this._registeredKeys !== null) {
+        if (this._registeredMembers !== null) {
             throw new Error('Cannot rewrite registered keys')
         }
-        this._registeredKeys = new Map();
+        this._registeredMembers = new Map();
         for (const keysByAddress of opts.initStorageKeys) {
             if (await this.getAccount(keysByAddress.address) === undefined) {
                 throw new Error('TokamakL2StateManager is not initialized.')
             }
             const usedL1Keys = new Set<bigint>();
             const registeredL2KeyBigInts = new Set<bigint>();
-            this._registeredKeys.set(bytesToBigInt(keysByAddress.address.bytes), new Map());
+            this._registeredMembers.set(bytesToBigInt(keysByAddress.address.bytes), new Map());
             for (const keys of keysByAddress.keyPairs) {
                 const keyL1BigInt = bytesToBigInt(keys.L1);
                 const keyL2BigInt = bytesToBigInt(keys.L2);
@@ -107,16 +107,16 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         for (const codeInfo of opts.contractCodes ?? []) {
             await this.putCode(codeInfo.address, hexToBytes(codeInfo.code));
         }
-        if (this._registeredKeys !== null) {
+        if (this._registeredMembers !== null) {
             throw new Error('Cannot rewrite registered keys')
         }
         if (snapshot.stateRoots.length !== snapshot.registeredMembers.length) {
             throw new Error('Snapshot is expected to have a set of registered members for each state root')
         }
-        this._registeredKeys = new Map();
+        this._registeredMembers = new Map();
         for (const registeredMembersForAddress of snapshot.registeredMembers) {
             const address = createAddressFromString(registeredMembersForAddress.storageAddress);
-            this._registeredKeys.set(bytesToBigInt(address.bytes), new Map());
+            this._registeredMembers.set(bytesToBigInt(address.bytes), new Map());
             for (const entry of registeredMembersForAddress.members) {
                 const vBytes = hexToBytes(addHexPrefix(entry.value));
                 const keyBytes = hexToBytes(addHexPrefix(entry.key));
@@ -128,12 +128,12 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
 
     async putStorage(address: Address, key: Uint8Array, value: Uint8Array): Promise<void> {
         await super.putStorage(address, key, value)
-        if (this._registeredKeys !== null) {
+        if (this._registeredMembers !== null) {
             const addressBigInt = bytesToBigInt(address.bytes)
-            let registeredKeysForAddress = this._registeredKeys.get(addressBigInt)
+            let registeredKeysForAddress = this._registeredMembers.get(addressBigInt)
             if (registeredKeysForAddress === undefined) {
                 registeredKeysForAddress = new Map()
-                this._registeredKeys.set(addressBigInt, registeredKeysForAddress)
+                this._registeredMembers.set(addressBigInt, registeredKeysForAddress)
             }
             registeredKeysForAddress.set(bytesToBigInt(key), bytesToBigInt(value))
         }
@@ -163,7 +163,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         return this._lastMerkleTrees
     }
 
-    public get registeredKeys() {return this._registeredKeys}
+    public get registeredKeys() {return this._registeredMembers}
     public get lastMerkleTrees(): TokamakL2MerkleTrees {
         if (this._lastMerkleTrees === null) {
             throw new Error('Merkle trees are not initialized.')
