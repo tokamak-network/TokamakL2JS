@@ -176,8 +176,8 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         if (this.registeredKeys === null) {
             throw new Error('Registered storage keys are not initialized.')
         }
-        if (prevSnapshot.storageAddresses.length !== prevSnapshot.registeredKeys.length) {
-            throw new Error('Snapshot is expected to have a set of register keys for each storage address')
+        if (prevSnapshot.stateRoots.length !== prevSnapshot.registeredMembers.length) {
+            throw new Error('Snapshot is expected to have a set of registered members for each state root')
         }
         await this.flush();
         const getUpdatedEntry = async (address: Address, keyBytes: Uint8Array): Promise<{key: string; value: string;}> => {
@@ -203,30 +203,32 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             );
         }
 
-        const registeredKeys: { key: string; value: string }[][] = [];
+        const registeredMembers: { storageAddress: string; members: { key: string; value: string }[] }[] = [];
         const stateRoots: string[] = [];
 
-        for (const addressStr of prevSnapshot.storageAddresses) {
-            const address = createAddressFromString(addressStr);
+        for (const registeredMembersForAddress of prevSnapshot.registeredMembers) {
+            const address = createAddressFromString(registeredMembersForAddress.storageAddress);
             const addressKey = address.toString().toLowerCase();
             const currentRegisteredKeys = registeredKeysByAddress.get(addressKey);
             const currentRoot = rootByAddress.get(addressKey);
 
             if (currentRegisteredKeys === undefined || currentRoot === undefined) {
-                throw new Error(`Cannot capture snapshot for unregistered storage address: ${addressStr}`)
+                throw new Error(`Cannot capture snapshot for unregistered storage address: ${registeredMembersForAddress.storageAddress}`)
             }
 
-            registeredKeys.push(
-                await Promise.all(currentRegisteredKeys.map((key) => getUpdatedEntry(address, hexToBytes(addHexPrefix(key.toString(16).padStart(64, "0"))))))
-            );
+            registeredMembers.push({
+                storageAddress: registeredMembersForAddress.storageAddress,
+                members: await Promise.all(
+                    currentRegisteredKeys.map((key) => getUpdatedEntry(address, hexToBytes(addHexPrefix(key.toString(16).padStart(64, "0")))))
+                ),
+            });
             stateRoots.push(currentRoot);
         }
 
         return {
             channelId: prevSnapshot.channelId,
             stateRoots,
-            storageAddresses: [...prevSnapshot.storageAddresses],
-            registeredKeys,
+            registeredMembers,
         };
     }
 }
