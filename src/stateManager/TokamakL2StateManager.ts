@@ -1,5 +1,5 @@
 import { MerkleStateManager } from "@ethereumjs/statemanager";
-import { RegisteredKeysForAddress, TokamakL2StateManagerOpts, TrackedStorageKeysForAddress } from "./types.js";
+import { MerkleTreeMembers, RegisteredKeysForAddress, TokamakL2StateManagerOpts, TrackedStorageKeysForAddress } from "./types.js";
 import { StateManagerInterface } from "@ethereumjs/common";
 import { SMT, type MerkleProof } from "@zk-kit/smt"
 import { addHexPrefix, Address, bytesToBigInt, bytesToHex, createAccount, createAddressFromString, hexToBigInt, hexToBytes, setLengthLeft } from "@ethereumjs/util";
@@ -7,8 +7,6 @@ import { ethers } from "ethers";
 import { RLP } from "@ethereumjs/rlp";
 import { poseidonChainCompress } from "../crypto/index.js";
 import { StateSnapshot } from "../interface/channel/types.js";
-
-type MerkleTreeEntriesForAddress = {address: Address, entries: [bigint, bigint][]};
 
 export class TokamakL2StateManager extends MerkleStateManager implements StateManagerInterface {
     private _cachedOpts: TokamakL2StateManagerOpts | null = null
@@ -218,16 +216,16 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         }
     }
 
-    public async convertLeavesIntoMerkleTreeLeavesForAddress(): Promise<MerkleTreeEntriesForAddress[]> {
-        const leaves: MerkleTreeEntriesForAddress[] = [];
+    public async convertLeavesIntoMerkleTreeLeavesForAddress(): Promise<MerkleTreeMembers> {
+        const leaves: MerkleTreeMembers = new Map();
         for (const registeredKeysForAddress of this.registeredKeys){ 
             const address = registeredKeysForAddress.address;
-            const leavesForAddress: [bigint, bigint][] = [];
+            const leavesForAddress = new Map<bigint, bigint>();
             for (const key of registeredKeysForAddress.keys) {
                 const val = await this.getStorage(address, key);
-                leavesForAddress.push([bytesToBigInt(key), bytesToBigInt(val)]);
+                leavesForAddress.set(bytesToBigInt(key), bytesToBigInt(val));
             }
-            leaves.push({address, entries: leavesForAddress});
+            leaves.set(bytesToBigInt(address.bytes), leavesForAddress);
         }
         return leaves
     }
@@ -356,12 +354,12 @@ export class TokamakL2MerkleTrees {
     public static async buildFromTokamakL2StateManager(mpt: TokamakL2StateManager): Promise<TokamakL2MerkleTrees> {
         const tokamakL2MerkleTree = new TokamakL2MerkleTrees(mpt);
         const leaves = await mpt.convertLeavesIntoMerkleTreeLeavesForAddress()
-        for (const leavesForAddress of leaves) {
-            const mt = new SMT((childNodes) => poseidonChainCompress(childNodes as bigint[]), true);
-            for (const [key, value] of leavesForAddress.entries) {
+        for (const [addressBigInt, members] of leaves.entries()) {
+            const mt = new SMT(poseidonChainCompress, true);
+            for (const [key, value] of members.entries()) {
                 mt.add(key, value);
             }
-            tokamakL2MerkleTree.addMerkleTree(leavesForAddress.address, mt);
+            tokamakL2MerkleTree.addMerkleTree(createAddressFromString(addHexPrefix(addressBigInt.toString(16).padStart(40, "0"))), mt);
         }
         return tokamakL2MerkleTree
     }
