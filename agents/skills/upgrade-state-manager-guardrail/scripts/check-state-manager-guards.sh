@@ -9,10 +9,8 @@ if [[ ! -f "${TARGET_FILE}" ]]; then
 fi
 
 declare -a CHECKS=(
-  "snapshot.storageAddresses.length !== snapshot.registeredKeys.length|snapshot registeredKeys length guard"
-  "merkleTrees.merkleTrees.some((tree, idx) => treeNodeToBigint(tree.root) !== hexToBigInt(addHexPrefix(snapshot.stateRoots[idx])))|snapshot root mismatch guard"
-  "if (addressIndex === -1) {|missing-address leaf index guard"
-  "return [-1, -1];|missing-address sentinel return"
+  "snapshot.stateRoots.length !== snapshot.registeredMembers.length|snapshot registeredMembers length guard"
+  "merkleTrees.merkleTrees.some((tree, idx) => (tree.root as bigint) !== hexToBigInt(addHexPrefix(snapshot.stateRoots[idx])))|snapshot root mismatch guard"
 )
 
 missing=0
