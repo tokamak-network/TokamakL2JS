@@ -144,7 +144,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
 
     public async convertLeavesIntoMerkleTreeLeavesForAddress(): Promise<MerkleTreeMembers> {
         const leaves: MerkleTreeMembers = new Map();
-        for (const [addressBigInt, registeredKeysForAddress] of this.registeredKeys.entries()){ 
+        for (const [addressBigInt, registeredKeysForAddress] of this.registeredMembers.entries()){ 
             const address = createAddressFromString(addHexPrefix(addressBigInt.toString(16).padStart(40, "0")));
             const leavesForAddress = new Map<bigint, bigint>();
             for (const key of registeredKeysForAddress.keys()) {
@@ -163,7 +163,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         return this._lastMerkleTrees
     }
 
-    public get registeredKeys() {return this._registeredMembers}
+    public get registeredMembers() {return this._registeredMembers}
     public get lastMerkleTrees(): TokamakL2MerkleTrees {
         if (this._lastMerkleTrees === null) {
             throw new Error('Merkle trees are not initialized.')
@@ -173,7 +173,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
     public get cachedOpts() {return this._cachedOpts}
 
     public async captureStateSnapshot(prevSnapshot: StateSnapshot): Promise<StateSnapshot> {
-        if (this.registeredKeys === null) {
+        if (this.registeredMembers === null) {
             throw new Error('Registered storage keys are not initialized.')
         }
         if (prevSnapshot.stateRoots.length !== prevSnapshot.registeredMembers.length) {
@@ -190,7 +190,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
 
         const merkleTrees = this.lastMerkleTrees;
         const registeredKeysByAddress = new Map<string, bigint[]>(
-            Array.from(this.registeredKeys.entries()).map(([addressBigInt, members]) => [
+            Array.from(this.registeredMembers.entries()).map(([addressBigInt, members]) => [
                 createAddressFromString(addHexPrefix(addressBigInt.toString(16).padStart(40, "0"))).toString().toLowerCase(),
                 Array.from(members.keys()),
             ])
