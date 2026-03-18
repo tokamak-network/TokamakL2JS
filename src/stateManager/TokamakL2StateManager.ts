@@ -175,14 +175,14 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         if (this._registeredKeys !== null) {
             throw new Error('Cannot rewrite registered keys')
         }
-        if (snapshot.storageAddresses.length !== snapshot.registeredKeys.length) {
-            throw new Error('Snapshot is expected to have a set of register keys for each storage address')
+        if (snapshot.stateRoots.length !== snapshot.registeredMembers.length) {
+            throw new Error('Snapshot is expected to have a set of registered members for each state root')
         }
         this._registeredKeys = new Map();
-        for (const [idx, addressStr] of snapshot.storageAddresses.entries()) {
-            const address = createAddressFromString(addressStr);
+        for (const registeredMembersForAddress of snapshot.registeredMembers) {
+            const address = createAddressFromString(registeredMembersForAddress.storageAddress);
             const registeredKeysForAddress = new Map<bigint, bigint>();
-            for (const entry of snapshot.registeredKeys[idx]) {
+            for (const entry of registeredMembersForAddress.members) {
                 const vBytes = hexToBytes(addHexPrefix(entry.value));
                 const keyBytes = hexToBytes(addHexPrefix(entry.key));
                 await this.putStorage(address, keyBytes, vBytes);
