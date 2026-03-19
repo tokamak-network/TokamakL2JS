@@ -145,7 +145,8 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         storageEntriesForAddress.set(bytesToBigInt(key), bytesToBigInt(value))
 
         await this.flush();
-        this._merkleTrees.trees
+        const tree = this._merkleTrees.trees.get(addressBigInt);
+        
     }
 
     public async convertLeavesIntoMerkleTreeLeavesForAddress(): Promise<MerkleTreeMembers> {
@@ -262,7 +263,7 @@ export class TokamakL2MerkleTrees {
         .map(addrBigint => createAddressFromBigInt(addrBigint))
     }
 
-    public getLeafIndex(key: bigint): number {
+    public static getLeafIndex(key: bigint): number {
         return Number(key % BigInt(MAX_MT_LEAVES));
     }
 
@@ -289,7 +290,7 @@ export class TokamakL2MerkleTrees {
         if (tree === undefined) {
             throw new Error(`Merkle tree is not registered for the address ${address.toString()}`);
         }
-        return tree.createProof(this.getLeafIndex(key));
+        return tree.createProof(TokamakL2MerkleTrees.getLeafIndex(key));
     }
 
     public static async buildFromTokamakL2StateManager(mpt: TokamakL2StateManager): Promise<TokamakL2MerkleTrees> {
@@ -302,7 +303,7 @@ export class TokamakL2MerkleTrees {
             const mt = new IMT(poseidon_raw as IMTHashFunction, MT_DEPTH, NULL_LEAF, POSEIDON_INPUTS);
             const keyByLeafIndex = new Map<number, bigint>();
             for (const [key, value] of members.entries()) {
-                const leafIndex = tokamakL2MerkleTree.getLeafIndex(key);
+                const leafIndex = TokamakL2MerkleTrees.getLeafIndex(key);
                 const existingKey = keyByLeafIndex.get(leafIndex);
                 if (existingKey !== undefined && existingKey !== key) {
                     throw new Error(`Conflicting leaf indexes for address ${addHexPrefix(addressBigInt.toString(16).padStart(40, "0"))}: keys ${existingKey.toString()} and ${key.toString()} map to leaf index ${leafIndex}`)
