@@ -36,11 +36,25 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         await this.fetchStorageFromSnapshot(snapshot, opts);
 
         const merkleTrees = await this._buildInitMerkleTrees();
-        if (merkleTrees.trees.length !== snapshot.stateRoots.length) {
+        if (merkleTrees.trees.size !== snapshot.stateRoots.length) {
             throw new Error(`Inconsistent numbers of Merkle trees between state manager and state snapshot.`)
         }
-        if (merkleTrees.trees.some((tree, idx) => treeNodeToBigint(tree.root) !== hexToBigInt(addHexPrefix(snapshot.stateRoots[idx])))) {
-            throw new Error(`Creating TokamakL2StateManager using StateSnapshot fails: (provided roots: ${snapshot.stateRoots}, reconstructed root: ${merkleTrees.merkleTrees.map(tree => tree.root.toString())})`)
+        const addresses = merkleTrees.getAddresses();
+        const roots = merkleTrees.getRoots();
+        const rootByAddress = new Map<string, bigint>(
+            addresses.map((address, idx) => [address.toString().toLowerCase(), roots[idx]])
+        );
+        const reconstructedRoots: string[] = [];
+
+        for (const [idx, addressString] of snapshot.storageAddresses.entries()) {
+            const reconstructedRoot = rootByAddress.get(addressString.toLowerCase());
+            if (reconstructedRoot === undefined) {
+                throw new Error(`Merkle tree is not registered for the address ${addressString}`)
+            }
+            reconstructedRoots.push(addHexPrefix(reconstructedRoot.toString(16)));
+            if (reconstructedRoot !== hexToBigInt(addHexPrefix(snapshot.stateRoots[idx]))) {
+                throw new Error(`Creating TokamakL2StateManager using StateSnapshot fails: (provided roots: ${snapshot.stateRoots}, reconstructed roots: ${reconstructedRoots})`)
+            }
         }
     }
 
@@ -210,13 +224,14 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
                 Array.from(members.keys()),
             ])
         );
-        const rootByAddress = new Map<bigint, string>();
-        for (const addressBigInt of merkleTrees.getAddresses().map(addr => bytesToBigInt(addr.bytes))) {
-            rootByAddress.set(
-                addressBigInt,
-                (merkleTrees.merkleTrees[idx].root as bigint).toString(16)
-            );
-        }
+        const addresses = merkleTrees.getAddresses();
+        const roots = merkleTrees.getRoots();
+        const rootByAddress = new Map<string, string>(
+            addresses.map((address, idx) => [
+                address.toString().toLowerCase(),
+                addHexPrefix(roots[idx].toString(16)),
+            ])
+        );
 
         const registeredKeys: RegisteredKeysJson = [];
         const stateRoots: string[] = [];
