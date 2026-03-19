@@ -2,7 +2,7 @@ import { MerkleStateManager } from "@ethereumjs/statemanager";
 import { MerkleTreeMembers, TokamakL2StateManagerOpts } from "./types.js";
 import { StateManagerInterface } from "@ethereumjs/common";
 import { IMT, IMTHashFunction, IMTMerkleProof, IMTNode } from "@zk-kit/imt"
-import { addHexPrefix, Address, bytesToBigInt, bytesToHex, concatBytes, createAccount, createAddressFromString, hexToBigInt, hexToBytes, setLengthLeft } from "@ethereumjs/util";
+import { addHexPrefix, Address, bytesToBigInt, bytesToHex, concatBytes, createAccount, createAddressFromBigInt, createAddressFromString, hexToBigInt, hexToBytes, setLengthLeft } from "@ethereumjs/util";
 import { ethers } from "ethers";
 import { RLP } from "@ethereumjs/rlp";
 import { MAX_MT_LEAVES, MT_DEPTH, NULL_LEAF, POSEIDON_INPUTS } from "../interface/params/index.js";
@@ -257,52 +257,38 @@ export class TokamakL2MerkleTrees {
 
     public getAddresses(): Address[] {
         return Array.from(this._trees.keys())
-            .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
-            .map((addressBigInt) =>
-                createAddressFromString(addHexPrefix(addressBigInt.toString(16).padStart(40, "0")))
-            );
+        .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(addrBigint => createAddressFromBigInt(addrBigint))
     }
 
-    public addMerkleTree(address: Address, mt: IMT) {
-        const addrBigint = bytesToBigInt(address.bytes);
-        if (this._trees.get(addrBigint) !== undefined) {
+    public getLeafIndex(key: bigint): number {
+        return Number(key % BigInt(MAX_MT_LEAVES));
+    }
+
+    private _addMerkleTree(address: bigint, mt: IMT) {
+        if (this._trees.get(address) !== undefined) {
             throw new Error('Cannot overwrite a Merkle tree at the same address')
         }
-        this._trees.set(addrBigint, mt);
+        this._trees.set(address, mt);
     }
 
     public getRoots(): bigint[] {
         return this.getAddresses().map((address) => {
             const tree = this._trees.get(bytesToBigInt(address.bytes));
             if (tree === undefined) {
-                throw new Error(`Merkle tree is not registered: ${address.toString()}`);
+                throw new Error(`Merkle tree is not registered for the address ${address.toString()}`);
             }
             return treeNodeToBigint(tree.root);
         });
     }
 
-    public getProof(treeIndex: [number, bigint]): IMTMerkleProof {
-        const tree = this.merkleTrees[treeIndex[0]];
+    public getProof(address: Address, key: bigint): IMTMerkleProof {
+        const addressBigInt = bytesToBigInt(address.bytes);
+        const tree = this._trees.get(addressBigInt);
         if (tree === undefined) {
-            throw new Error(`Merkle tree is not registered: ${treeIndex[0]}`);
+            throw new Error(`Merkle tree is not registered for the address ${address.toString()}`);
         }
-        const address = this.addresses[treeIndex[0]];
-        if (address === undefined) {
-            throw new Error(`Merkle tree address is not registered: ${treeIndex[0]}`);
-        }
-        const storageEntries = this.cachedTokamakL2StateManager.storageEntries;
-        if (storageEntries === null) {
-            throw new Error("Registered storage keys are not initialized.");
-        }
-        const membersForAddress = storageEntries.get(bytesToBigInt(address.bytes));
-        if (membersForAddress === undefined) {
-            throw new Error(`Merkle tree members are not registered: ${address.toString()}`);
-        }
-        const leafIndex = Array.from(membersForAddress.keys()).findIndex((key) => key === treeIndex[1]);
-        if (leafIndex === -1) {
-            throw new Error(`Merkle tree leaf is not registered: ${treeIndex[1].toString()}`);
-        }
-        return tree.createProof(leafIndex);
+        return tree.createProof(this.getLeafIndex(key));
     }
 
     public static async buildFromTokamakL2StateManager(mpt: TokamakL2StateManager): Promise<TokamakL2MerkleTrees> {
@@ -312,23 +298,17 @@ export class TokamakL2MerkleTrees {
             if (members.size > MAX_MT_LEAVES) {
                 throw new Error(`Allowed maximum number of storage slots = ${MAX_MT_LEAVES}, but taking ${members.size} for address ${addHexPrefix(addressBigInt.toString(16).padStart(40, "0"))}`)
             }
-            const memberEntries = Array.from(members.entries());
-            const denseLeaves: bigint[] = [];
-            for (let index = 0; index < MAX_MT_LEAVES; index++) {
-                const member = memberEntries[index];
-                if (member === undefined) {
-                    denseLeaves[index] = NULL_LEAF;
-                } else {
-                    const [key, value] = member;
-                    const leafData = concatBytes(
-                        setLengthLeft(hexToBytes(addHexPrefix(key.toString(16))), 32),
-                        setLengthLeft(hexToBytes(addHexPrefix(value.toString(16))), 32),
-                    );
-                    denseLeaves[index] = bytesToBigInt(poseidon(leafData));
-                }
+            const denseLeaves: bigint[] = Array(MAX_MT_LEAVES).fill(bytesToBigInt(poseidon(NULL_LEAF)));
+            for (const [key, value] of members.entries()) {
+                const leafIndex = tokamakL2MerkleTree.getLeafIndex(key);
+                const leafData = concatBytes(
+                    setLengthLeft(hexToBytes(addHexPrefix(key.toString(16))), 32),
+                    setLengthLeft(hexToBytes(addHexPrefix(value.toString(16))), 32),
+                );
+                denseLeaves[leafIndex] = bytesToBigInt(poseidon(leafData));
             }
             const mt = new IMT(poseidon_raw as IMTHashFunction, MT_DEPTH, NULL_LEAF, POSEIDON_INPUTS, denseLeaves as IMTNode[]);
-            tokamakL2MerkleTree.addMerkleTree(createAddressFromString(addHexPrefix(addressBigInt.toString(16).padStart(40, "0"))), mt);
+            tokamakL2MerkleTree._addMerkleTree(addressBigInt, mt);
         }
         return tokamakL2MerkleTree
     }
