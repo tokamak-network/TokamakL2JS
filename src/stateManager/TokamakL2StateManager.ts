@@ -299,8 +299,14 @@ export class TokamakL2MerkleTrees {
                 throw new Error(`Allowed maximum number of storage slots = ${MAX_MT_LEAVES}, but taking ${members.size} for address ${addHexPrefix(addressBigInt.toString(16).padStart(40, "0"))}`)
             }
             const denseLeaves: bigint[] = Array(MAX_MT_LEAVES).fill(bytesToBigInt(poseidon(NULL_LEAF)));
+            const keyByLeafIndex = new Map<number, bigint>();
             for (const [key, value] of members.entries()) {
                 const leafIndex = tokamakL2MerkleTree.getLeafIndex(key);
+                const existingKey = keyByLeafIndex.get(leafIndex);
+                if (existingKey !== undefined && existingKey !== key) {
+                    throw new Error(`Conflicting leaf indexes for address ${addHexPrefix(addressBigInt.toString(16).padStart(40, "0"))}: keys ${existingKey.toString()} and ${key.toString()} map to leaf index ${leafIndex}`)
+                }
+                keyByLeafIndex.set(leafIndex, key);
                 const leafData = concatBytes(
                     setLengthLeft(hexToBytes(addHexPrefix(key.toString(16))), 32),
                     setLengthLeft(hexToBytes(addHexPrefix(value.toString(16))), 32),
