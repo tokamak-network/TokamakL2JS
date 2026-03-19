@@ -1,12 +1,14 @@
 import { MerkleStateManager } from "@ethereumjs/statemanager";
 import { MerkleTreeMembers, TokamakL2StateManagerOpts } from "./types.js";
 import { StateManagerInterface } from "@ethereumjs/common";
-import { SMT, type MerkleProof } from "@zk-kit/smt"
-import { addHexPrefix, Address, bytesToBigInt, bytesToHex, createAccount, createAddressFromString, hexToBigInt, hexToBytes, setLengthLeft } from "@ethereumjs/util";
+import { IMT, IMTHashFunction, IMTMerkleProof, IMTNode } from "@zk-kit/imt"
+import { addHexPrefix, Address, bytesToBigInt, bytesToHex, concatBytes, createAccount, createAddressFromString, hexToBigInt, hexToBytes, setLengthLeft } from "@ethereumjs/util";
 import { ethers } from "ethers";
 import { RLP } from "@ethereumjs/rlp";
-import { poseidonChainCompress } from "../crypto/index.js";
+import { MAX_MT_LEAVES, MT_DEPTH, NULL_LEAF, POSEIDON_INPUTS } from "../interface/params/index.js";
+import { poseidon, poseidon_raw } from "../crypto/index.js";
 import { StateSnapshot } from "../interface/channel/types.js";
+import { treeNodeToBigint } from "./utils.js";
 
 export class TokamakL2StateManager extends MerkleStateManager implements StateManagerInterface {
     private _cachedOpts: TokamakL2StateManagerOpts | null = null
@@ -37,7 +39,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         if (merkleTrees.merkleTrees.length !== snapshot.stateRoots.length) {
             throw new Error(`Inconsistent numbers of Merkle trees between state manager and state snapshot.`)
         }
-        if (merkleTrees.merkleTrees.some((tree, idx) => (tree.root as bigint) !== hexToBigInt(addHexPrefix(snapshot.stateRoots[idx])))) {
+        if (merkleTrees.merkleTrees.some((tree, idx) => treeNodeToBigint(tree.root) !== hexToBigInt(addHexPrefix(snapshot.stateRoots[idx])))) {
             throw new Error(`Creating TokamakL2StateManager using StateSnapshot fails: (provided roots: ${snapshot.stateRoots}, reconstructed root: ${merkleTrees.merkleTrees.map(tree => tree.root.toString())})`)
         }
     }
@@ -236,7 +238,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
 export class TokamakL2MerkleTrees {
     private _cachedTokamakL2StateManager: TokamakL2StateManager | null = null;
     private _addresses: Address[] = [];
-    private _merkleTrees: SMT[] = [];
+    private _merkleTrees: IMT[] = [];
 
     constructor(stateManager: TokamakL2StateManager) {
         this._cachedTokamakL2StateManager = stateManager;
@@ -254,31 +256,63 @@ export class TokamakL2MerkleTrees {
         return this._merkleTrees
     }
 
-    public addMerkleTree(address: Address, mt: SMT) {
+    public addMerkleTree(address: Address, mt: IMT) {
         this._addresses.push(address);
         this._merkleTrees.push(mt);
     }
 
     public getRoots(): bigint[] {
-        return this.merkleTrees.map((tree) => tree.root as bigint);
+        return this.merkleTrees.map((tree) => treeNodeToBigint(tree.root));
     }
 
-    public getProof(treeIndex: [number, bigint]): MerkleProof {
+    public getProof(treeIndex: [number, bigint]): IMTMerkleProof {
         const tree = this.merkleTrees[treeIndex[0]];
         if (tree === undefined) {
             throw new Error(`Merkle tree is not registered: ${treeIndex[0]}`);
         }
-        return tree.createProof(treeIndex[1]) as MerkleProof;
+        const address = this.addresses[treeIndex[0]];
+        if (address === undefined) {
+            throw new Error(`Merkle tree address is not registered: ${treeIndex[0]}`);
+        }
+        const registeredMembers = this.cachedTokamakL2StateManager.registeredMembers;
+        if (registeredMembers === null) {
+            throw new Error("Registered storage keys are not initialized.");
+        }
+        const membersForAddress = registeredMembers.get(bytesToBigInt(address.bytes));
+        if (membersForAddress === undefined) {
+            throw new Error(`Merkle tree members are not registered: ${address.toString()}`);
+        }
+        const leafIndex = Array.from(membersForAddress.keys()).findIndex((key) => key === treeIndex[1]);
+        if (leafIndex === -1) {
+            throw new Error(`Merkle tree leaf is not registered: ${treeIndex[1].toString()}`);
+        }
+        return tree.createProof(leafIndex);
     }
 
     public static async buildFromTokamakL2StateManager(mpt: TokamakL2StateManager): Promise<TokamakL2MerkleTrees> {
         const tokamakL2MerkleTree = new TokamakL2MerkleTrees(mpt);
         const leaves = await mpt.convertLeavesIntoMerkleTreeLeavesForAddress()
         for (const [addressBigInt, members] of leaves.entries()) {
-            const mt = new SMT(poseidonChainCompress, true);
-            for (const [key, value] of members.entries()) {
-                mt.add(key, value);
+            if (members.size > MAX_MT_LEAVES) {
+                throw new Error(`Allowed maximum number of storage slots = ${MAX_MT_LEAVES}, but taking ${members.size} for address ${addHexPrefix(addressBigInt.toString(16).padStart(40, "0"))}`)
             }
+            const memberEntries = Array.from(members.entries());
+            const denseLeaves: bigint[] = [];
+            for (let index = 0; index < MAX_MT_LEAVES; index++) {
+                const member = memberEntries[index];
+                let leafData: Uint8Array;
+                if (member === undefined) {
+                    leafData = NULL_LEAF;
+                } else {
+                    const [key, value] = member;
+                    leafData = concatBytes(
+                        setLengthLeft(hexToBytes(addHexPrefix(key.toString(16))), 32),
+                        setLengthLeft(hexToBytes(addHexPrefix(value.toString(16))), 32),
+                    );
+                }
+                denseLeaves[index] = bytesToBigInt(poseidon(leafData));
+            }
+            const mt = new IMT(poseidon_raw as IMTHashFunction, MT_DEPTH, 0n, POSEIDON_INPUTS, denseLeaves as IMTNode[]);
             tokamakL2MerkleTree.addMerkleTree(createAddressFromString(addHexPrefix(addressBigInt.toString(16).padStart(40, "0"))), mt);
         }
         return tokamakL2MerkleTree
