@@ -13,7 +13,7 @@ import { treeNodeToBigint } from "./utils.js";
 export class TokamakL2StateManager extends MerkleStateManager implements StateManagerInterface {
     private _cachedOpts: TokamakL2StateManagerOpts | null = null
     private _registeredMembers: MerkleTreeMembers | null = null
-    private _lastMerkleTrees: TokamakL2MerkleTrees | null = null
+    private _merkleTrees: TokamakL2MerkleTrees | null = null
 
     public async initTokamakExtendsFromRPC(rpcUrl: string, opts: TokamakL2StateManagerOpts): Promise<void> {
         if (this._cachedOpts !== null) {
@@ -139,7 +139,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             }
             registeredKeysForAddress.set(bytesToBigInt(key), bytesToBigInt(value))
         }
-        if (this._lastMerkleTrees !== null) {
+        if (this._merkleTrees !== null) {
             await this._getUpdatedMerkleTree()
         }
     }
@@ -161,16 +161,16 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
 
     private async _getUpdatedMerkleTree(): Promise<TokamakL2MerkleTrees> {
         await this.flush();
-        this._lastMerkleTrees = await TokamakL2MerkleTrees.buildFromTokamakL2StateManager(this)
-        return this._lastMerkleTrees
+        this._merkleTrees = await TokamakL2MerkleTrees.buildFromTokamakL2StateManager(this)
+        return this._merkleTrees
     }
 
     public get registeredMembers() {return this._registeredMembers}
     public get lastMerkleTrees(): TokamakL2MerkleTrees {
-        if (this._lastMerkleTrees === null) {
+        if (this._merkleTrees === null) {
             throw new Error('Merkle trees are not initialized.')
         }
-        return this._lastMerkleTrees
+        return this._merkleTrees
     }
     public get cachedOpts() {return this._cachedOpts}
 
