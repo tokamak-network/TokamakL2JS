@@ -20,7 +20,7 @@ const main = async () => {
 
   const stateManager = await createTokamakL2StateManagerFromStateSnapshot(snapshot, {
     common: createTokamakL2Common(),
-    storageAddresses: snapshot.registeredMembers.map((entry) =>
+    storageAddresses: snapshot.storageEntries.map((entry) =>
       createAddressFromString(entry.storageAddress)
     ),
   });

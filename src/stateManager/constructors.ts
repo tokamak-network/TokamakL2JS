@@ -24,7 +24,7 @@ export async function createTokamakL2StateManagerFromStateSnapshot(
     snapshot: StateSnapshot,
     opts: TokamakL2StateManagerOpts,
 ): Promise<TokamakL2StateManager> {
-    for (const registeredMembersForAddress of snapshot.registeredMembers) {
+    for (const registeredMembersForAddress of snapshot.storageEntries) {
         if (registeredMembersForAddress.members.length > MAX_MT_LEAVES) {
             throw new Error(`Allowed maximum number of storage slots = ${MAX_MT_LEAVES}, but taking ${registeredMembersForAddress.members.length} for address ${registeredMembersForAddress.storageAddress}`)
         }

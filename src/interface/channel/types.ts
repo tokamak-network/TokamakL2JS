@@ -1,6 +1,6 @@
 export type StateSnapshot = {
   stateRoots: string[];
-  registeredMembers: {storageAddress: string, members: {key: string, value: string}[]}[];
+  storageEntries: {storageAddress: string, members: {key: string, value: string}[]}[];
   channelId: number;
 }
 

@@ -73,7 +73,7 @@ const getRegisteredKeySetForContract = (
   snapshot: StateSnapshot,
   contractAddress: Address
 ): Set<bigint> => {
-  const contractMembers = snapshot.registeredMembers.find((entry) =>
+  const contractMembers = snapshot.storageEntries.find((entry) =>
     createAddressFromString(entry.storageAddress).equals(contractAddress)
   );
   if (contractMembers === undefined) {
@@ -109,7 +109,7 @@ const main = async () => {
   const common = createTokamakL2Common();
   const stateManager = await createTokamakL2StateManagerFromStateSnapshot(inputSnapshot, {
     common,
-    storageAddresses: inputSnapshot.registeredMembers.map((entry) =>
+    storageAddresses: inputSnapshot.storageEntries.map((entry) =>
       createAddressFromString(entry.storageAddress)
     ),
     contractCodes: contractCodes.map((entry) => ({
