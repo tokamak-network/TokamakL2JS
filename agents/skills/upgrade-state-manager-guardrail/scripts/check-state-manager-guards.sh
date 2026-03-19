@@ -9,7 +9,7 @@ if [[ ! -f "${TARGET_FILE}" ]]; then
 fi
 
 declare -a CHECKS=(
-  "snapshot.stateRoots.length !== snapshot.storageEntries.length|snapshot storageEntries length guard"
+  "snapshot.storageAddresses.length !== snapshot.registeredKeys.length|snapshot registeredKeys/storageAddresses length guard"
   "merkleTrees.merkleTrees.some((tree, idx) => (tree.root as bigint) !== hexToBigInt(addHexPrefix(snapshot.stateRoots[idx])))|snapshot root mismatch guard"
 )
 

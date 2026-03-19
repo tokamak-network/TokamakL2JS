@@ -20,9 +20,7 @@ const main = async () => {
 
   const stateManager = await createTokamakL2StateManagerFromStateSnapshot(snapshot, {
     common: createTokamakL2Common(),
-    storageAddresses: snapshot.storageEntries.map((entry) =>
-      createAddressFromString(entry.storageAddress)
-    ),
+    storageAddresses: snapshot.storageAddresses.map((entry) => createAddressFromString(entry)),
   });
 
   const merkleTrees = stateManager.lastMerkleTrees;

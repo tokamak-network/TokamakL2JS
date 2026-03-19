@@ -7,7 +7,7 @@ import { ethers } from "ethers";
 import { RLP } from "@ethereumjs/rlp";
 import { MAX_MT_LEAVES, MT_DEPTH, NULL_LEAF, POSEIDON_INPUTS } from "../interface/params/index.js";
 import { poseidon, poseidon_raw } from "../crypto/index.js";
-import { StateSnapshot } from "../interface/channel/types.js";
+import { RegisteredKeysJson, StateSnapshot } from "../interface/channel/types.js";
 import { treeNodeToBigint } from "./utils.js";
 
 export class TokamakL2StateManager extends MerkleStateManager implements StateManagerInterface {
@@ -112,14 +112,14 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         if (this._storageEntries !== null) {
             throw new Error('Cannot rewrite registered keys')
         }
-        if (snapshot.stateRoots.length !== snapshot.storageEntries.length) {
+        if (snapshot.stateRoots.length !== snapshot.storageAddresses.length || snapshot.storageAddresses.length !== snapshot.registeredKeys.length) {
             throw new Error('Snapshot is expected to have a set of registered members for each state root')
         }
         this._storageEntries = new Map();
-        for (const storageEntriesForAddress of snapshot.storageEntries) {
-            const address = createAddressFromString(storageEntriesForAddress.storageAddress);
+        for (const [idx, addressString] of snapshot.storageAddresses.entries()) {
+            const address = createAddressFromString(addressString);
             this._storageEntries.set(bytesToBigInt(address.bytes), new Map());
-            for (const entry of storageEntriesForAddress.members) {
+            for (const entry of snapshot.registeredKeys[idx]) {
                 const vBytes = hexToBytes(addHexPrefix(entry.value));
                 const keyBytes = hexToBytes(addHexPrefix(entry.key));
                 await this.putStorage(address, keyBytes, vBytes);
@@ -182,7 +182,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         if (this.storageEntries === null) {
             throw new Error('Registered storage keys are not initialized.')
         }
-        if (prevSnapshot.stateRoots.length !== prevSnapshot.storageEntries.length) {
+        if (prevSnapshot.stateRoots.length !== prevSnapshot.storageAddresses.length || prevSnapshot.storageAddresses.length !== prevSnapshot.registeredKeys.length) {
             throw new Error('Snapshot is expected to have a set of registered members for each state root')
         }
         await this.flush();
@@ -201,40 +201,41 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
                 Array.from(members.keys()),
             ])
         );
-        const rootByAddress = new Map<string, string>();
-        for (const [idx, address] of merkleTrees.addresses.entries()) {
+        const rootByAddress = new Map<bigint, string>();
+        for (const addressBigInt of merkleTrees.getAddresses().map(addr => bytesToBigInt(addr.bytes))) {
             rootByAddress.set(
-                address.toString().toLowerCase(),
+                addressBigInt,
                 (merkleTrees.merkleTrees[idx].root as bigint).toString(16)
             );
         }
 
-        const storageEntries: { storageAddress: string; members: { key: string; value: string }[] }[] = [];
+        const registeredKeys: RegisteredKeysJson = [];
         const stateRoots: string[] = [];
 
-        for (const storageEntriesForAddress of prevSnapshot.storageEntries) {
-            const address = createAddressFromString(storageEntriesForAddress.storageAddress);
+        for (const addressString of prevSnapshot.storageAddresses) {
+            const address = createAddressFromString(addressString);
             const addressKey = address.toString().toLowerCase();
             const currentRegisteredKeys = registeredKeysByAddress.get(addressKey);
             const currentRoot = rootByAddress.get(addressKey);
 
             if (currentRegisteredKeys === undefined || currentRoot === undefined) {
-                throw new Error(`Cannot capture snapshot for unregistered storage address: ${storageEntriesForAddress.storageAddress}`)
+                throw new Error(`Cannot capture snapshot for unregistered storage address: ${addressString}`)
             }
 
-            storageEntries.push({
-                storageAddress: storageEntriesForAddress.storageAddress,
-                members: await Promise.all(
+            registeredKeys.push(
+                await Promise.all(
                     currentRegisteredKeys.map((key) => getUpdatedEntry(address, hexToBytes(addHexPrefix(key.toString(16).padStart(64, "0")))))
-                ),
-            });
+                )
+            );
             stateRoots.push(currentRoot);
         }
 
         return {
             channelId: prevSnapshot.channelId,
             stateRoots,
-            storageEntries: storageEntries,
+            storageAddresses: [...prevSnapshot.storageAddresses],
+            registeredKeys,
+            entryContractAddress: prevSnapshot.entryContractAddress,
         };
     }
 }
@@ -298,7 +299,7 @@ export class TokamakL2MerkleTrees {
             if (members.size > MAX_MT_LEAVES) {
                 throw new Error(`Allowed maximum number of storage slots = ${MAX_MT_LEAVES}, but taking ${members.size} for address ${addHexPrefix(addressBigInt.toString(16).padStart(40, "0"))}`)
             }
-            const denseLeaves: bigint[] = Array(MAX_MT_LEAVES).fill(bytesToBigInt(poseidon(NULL_LEAF)));
+            const mt = new IMT(poseidon_raw as IMTHashFunction, MT_DEPTH, NULL_LEAF, POSEIDON_INPUTS);
             const keyByLeafIndex = new Map<number, bigint>();
             for (const [key, value] of members.entries()) {
                 const leafIndex = tokamakL2MerkleTree.getLeafIndex(key);
@@ -307,13 +308,8 @@ export class TokamakL2MerkleTrees {
                     throw new Error(`Conflicting leaf indexes for address ${addHexPrefix(addressBigInt.toString(16).padStart(40, "0"))}: keys ${existingKey.toString()} and ${key.toString()} map to leaf index ${leafIndex}`)
                 }
                 keyByLeafIndex.set(leafIndex, key);
-                const leafData = concatBytes(
-                    setLengthLeft(hexToBytes(addHexPrefix(key.toString(16))), 32),
-                    setLengthLeft(hexToBytes(addHexPrefix(value.toString(16))), 32),
-                );
-                denseLeaves[leafIndex] = bytesToBigInt(poseidon(leafData));
+                mt.update(leafIndex, poseidon_raw([key, value]));
             }
-            const mt = new IMT(poseidon_raw as IMTHashFunction, MT_DEPTH, NULL_LEAF, POSEIDON_INPUTS, denseLeaves as IMTNode[]);
             tokamakL2MerkleTree._addMerkleTree(addressBigInt, mt);
         }
         return tokamakL2MerkleTree
