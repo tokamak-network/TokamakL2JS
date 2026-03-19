@@ -1,12 +1,11 @@
 export type StateSnapshot = {
   stateRoots: string[];
   storageAddresses: string[];
-  registeredKeys: RegisteredKeysJson;
-  entryContractAddress: string;
+  storageEntries: StorageEntriesJson;
   channelId: number;
 }
 
-export type RegisteredKeysJson = {key: string, value: string}[][]
+export type StorageEntriesJson = { key: string; value: string }[][]
 
 export type TxSnapshot = {
   nonce: number;
