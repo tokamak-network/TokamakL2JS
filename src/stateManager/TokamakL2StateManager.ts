@@ -134,7 +134,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         }
 
         const registeredLeafIndex = keyLeafIndexesForAddress.get(keyBigInt);
-        if (registeredLeafIndex === undefined && valueBigInt !== 0n) {
+        if (registeredLeafIndex === undefined) {
             for (const [registeredStorageKey, registeredLeafIndex] of keyLeafIndexesForAddress.entries()) {
                 if (registeredLeafIndex === leafIndex) {
                     throw new Error(`Leaf index collision for address ${address.toString()}: storage key ${keyBigInt.toString()} conflicts with storage key ${registeredStorageKey.toString()} at leaf index ${leafIndex}`)
@@ -147,23 +147,14 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         const leaf = this._merkleTrees.update(addressBigInt, keyBigInt, valueBigInt);
 
         let storageEntriesForAddress = this._storageEntries.get(addressBigInt)
-        if (leaf === null) {
-            if (registeredLeafIndex !== undefined) {
-                keyLeafIndexesForAddress.delete(keyBigInt)
-            }
-            if (storageEntriesForAddress !== undefined && storageEntriesForAddress.has(keyBigInt)) {
-                storageEntriesForAddress.delete(keyBigInt)
-            }
-        } else {
-            if (registeredLeafIndex === undefined) {
-                keyLeafIndexesForAddress.set(keyBigInt, leafIndex)
-            }
-            if (storageEntriesForAddress === undefined) {
-                storageEntriesForAddress = new Map()
-                this._storageEntries.set(addressBigInt, storageEntriesForAddress)
-            }
-            storageEntriesForAddress.set(keyBigInt, valueBigInt)
+        if (registeredLeafIndex === undefined) {
+            keyLeafIndexesForAddress.set(keyBigInt, leafIndex)
         }
+        if (storageEntriesForAddress === undefined) {
+            storageEntriesForAddress = new Map()
+            this._storageEntries.set(addressBigInt, storageEntriesForAddress)
+        }
+        storageEntriesForAddress.set(keyBigInt, valueBigInt)
     }
 
     public get storageEntries() {return this._storageEntries}
@@ -234,20 +225,15 @@ export class TokamakL2MerkleTrees {
         return this._trees
     }
     
-    public update(address: bigint, key: bigint, value: bigint): bigint | null {
+    public update(address: bigint, key: bigint, value: bigint): bigint {
         const tree = this._trees.get(address);
         if (tree === undefined) {
             throw new Error(`Merkle tree is not registered for the address ${address.toString()}`);
         }
         const leafIndex = TokamakL2MerkleTrees.getLeafIndex(key);
-        if (value === 0n) {
-            tree.update(leafIndex, NULL_LEAF);
-            return null
-        } else {
-            const leaf = value % BLS12381_SCALAR_FIELD;
-            tree.update(leafIndex, leaf);
-            return leaf
-        }
+        const leaf = value % BLS12381_SCALAR_FIELD;
+        tree.update(leafIndex, leaf);
+        return leaf
     }
 
     public static getLeafIndex(key: bigint): number {
