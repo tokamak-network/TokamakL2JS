@@ -189,7 +189,7 @@ export class TokamakL2MerkleTrees {
     constructor(addresses: Address[]) {
         this._trees = new Map<bigint, IMT>();
         const leaves = Array(MAX_MT_LEAVES).fill(NULL_LEAF);
-        addresses.map(addr => this._trees.set(bytesToBigInt(addr.bytes), new IMT(poseidon_raw as IMTHashFunction, MT_DEPTH, NULL_LEAF, POSEIDON_INPUTS, leaves)));
+        addresses.forEach(addr => this._trees.set(bytesToBigInt(addr.bytes), new IMT(poseidon_raw as IMTHashFunction, MT_DEPTH, NULL_LEAF, POSEIDON_INPUTS, leaves)));
     }
 
     public get trees() {
