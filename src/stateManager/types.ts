@@ -15,12 +15,11 @@ export type contractCodeForAddress = {
     code: `0x${string}`,
 };
 
-export type TokamakL2StateManagerCommonOpts = {
+export type TokamakL2StateManagerOpts = {
     common: Common,
-}
-
-export type TokamakL2StateManagerRPCOpts = TokamakL2StateManagerCommonOpts
-
-export type TokamakL2StateManagerSnapshotOpts = TokamakL2StateManagerCommonOpts & {
+    initStorageKeys?: storageKeysForAddress[],
+    storageAddresses?: Address[],
+    blockNumber?: number,
     contractCodes?: contractCodeForAddress[]
+    callCodeAddresses?: Address[],
 }
