@@ -1,5 +1,5 @@
 import { MerkleStateManager } from "@ethereumjs/statemanager";
-import { MerkleTreeMembers, TokamakL2StateManagerOpts } from "./types.js";
+import { MerkleTreeMembers, TokamakL2StateManagerRPCOpts, TokamakL2StateManagerSnapshotOpts } from "./types.js";
 import { StateManagerInterface } from "@ethereumjs/common";
 import { IMT, IMTHashFunction, IMTMerkleProof, IMTNode } from "@zk-kit/imt"
 import { addHexPrefix, Address, bytesToBigInt, bytesToHex, concatBytes, createAccount, createAddressFromBigInt, createAddressFromString, hexToBigInt, hexToBytes, setLengthLeft } from "@ethereumjs/util";
@@ -11,11 +11,11 @@ import { StateSnapshot, StorageEntriesJson } from "../interface/channel/types.js
 import { treeNodeToBigint } from "./utils.js";
 
 export class TokamakL2StateManager extends MerkleStateManager implements StateManagerInterface {
-    private _cachedOpts: TokamakL2StateManagerOpts | null = null
+    private _cachedOpts: TokamakL2StateManagerRPCOpts | TokamakL2StateManagerSnapshotOpts | null = null
     private _storageEntries: MerkleTreeMembers | null = null
     private _merkleTrees: TokamakL2MerkleTrees | null = null
 
-    public async initTokamakExtendsFromRPC(rpcUrl: string, opts: TokamakL2StateManagerOpts): Promise<void> {
+    public async initTokamakExtendsFromRPC(rpcUrl: string, opts: TokamakL2StateManagerRPCOpts): Promise<void> {
         if (this._cachedOpts !== null) {
             throw new Error('Cannot rewrite cached opts')
         }
@@ -26,7 +26,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         await this._buildInitMerkleTrees();
     }
 
-    public async initTokamakExtendsFromSnapshot(snapshot: StateSnapshot, opts: TokamakL2StateManagerOpts): Promise<void> {
+    public async initTokamakExtendsFromSnapshot(snapshot: StateSnapshot, opts: TokamakL2StateManagerSnapshotOpts): Promise<void> {
         if (this._cachedOpts !== null) {
             throw new Error('Cannot rewrite cached opts')
         }
@@ -58,7 +58,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         }
     }
 
-    async initTokamakExtend(opts: TokamakL2StateManagerOpts): Promise<void> {
+    async initTokamakExtend(opts: TokamakL2StateManagerRPCOpts | TokamakL2StateManagerSnapshotOpts): Promise<void> {
         if (opts.common.customCrypto.keccak256 === undefined) {
             throw new Error('Custom crypto must be set')
         }
@@ -75,7 +75,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         await Promise.all(addresses.map(addr => openAccount(addr)));
     }
 
-    async fetchStorageFromRPC(rpcUrl: string, opts: TokamakL2StateManagerOpts): Promise<void> {
+    async fetchStorageFromRPC(rpcUrl: string, opts: TokamakL2StateManagerRPCOpts): Promise<void> {
         const provider = new ethers.JsonRpcProvider(rpcUrl)
         if (opts.blockNumber === undefined ) {
             throw new Error('Creating TokamakL2StateManager from RPC requires a block number.')
@@ -119,7 +119,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         await this.flush();
     }
 
-    async fetchStorageFromSnapshot(snapshot: StateSnapshot, opts: TokamakL2StateManagerOpts): Promise<void> {
+    async fetchStorageFromSnapshot(snapshot: StateSnapshot, opts: TokamakL2StateManagerSnapshotOpts): Promise<void> {
         for (const codeInfo of opts.contractCodes ?? []) {
             await this.putCode(codeInfo.address, hexToBytes(codeInfo.code));
         }

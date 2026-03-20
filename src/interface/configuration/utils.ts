@@ -9,7 +9,7 @@ import { jubjub } from "@noble/curves/misc.js";
 import { createTokamakL2Common } from "../../common/index.js";
 import {
   storageKeysForAddress,
-  TokamakL2StateManagerOpts,
+  TokamakL2StateManagerRPCOpts,
 } from "../../stateManager/types.js";
 import { fromEdwardsToAddress, getUserStorageKey } from "../../utils/index.js";
 import { deriveL2KeysFromSignature } from "../wallet/index.js";
@@ -18,7 +18,7 @@ import { ChannelStateConfig } from "./types.js";
 
 export function createStateManagerOptsFromChannelConfig(
   config: ChannelStateConfig
-): TokamakL2StateManagerOpts {
+): TokamakL2StateManagerRPCOpts {
   const privateSignatures = config.participants.map((entry) =>
     bytesToHex(jubjub.utils.randomPrivateKey(setLengthLeft(utf8ToBytes(entry.prvSeedL2), 32)))
   );
@@ -59,6 +59,9 @@ export function createStateManagerOptsFromChannelConfig(
 
   return {
     common,
+    storageAddresses: config.storageConfigs.map((entry) =>
+      createAddressFromString(entry.address)
+    ),
     blockNumber: config.blockNumber,
     initStorageKeys,
     callCodeAddresses: config.callCodeAddresses.map((str) =>

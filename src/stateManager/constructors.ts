@@ -1,11 +1,11 @@
-import { TokamakL2StateManagerOpts } from "./types.js";
+import { TokamakL2StateManagerRPCOpts, TokamakL2StateManagerSnapshotOpts } from "./types.js";
 import { TokamakL2StateManager } from "./TokamakL2StateManager.js";
 import { MAX_MT_LEAVES } from "../interface/params/index.js";
 import { StateSnapshot } from "../interface/channel/types.js";
 
 export async function createTokamakL2StateManagerFromL1RPC(
     rpcUrl: string,
-    opts: TokamakL2StateManagerOpts,
+    opts: TokamakL2StateManagerRPCOpts,
 ): Promise<TokamakL2StateManager> {
     if (opts.initStorageKeys === undefined) {
         throw new Error('Creating TokamakL2StateManager using StateSnapshot requires L1 and L2 key pairs.')
@@ -22,7 +22,7 @@ export async function createTokamakL2StateManagerFromL1RPC(
 
 export async function createTokamakL2StateManagerFromStateSnapshot(
     snapshot: StateSnapshot,
-    opts: TokamakL2StateManagerOpts,
+    opts: TokamakL2StateManagerSnapshotOpts,
 ): Promise<TokamakL2StateManager> {
     if (snapshot.storageAddresses.length !== snapshot.storageEntries.length) {
         throw new Error('Snapshot is expected to have a set of storage entries for each storage address')
