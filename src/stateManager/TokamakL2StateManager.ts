@@ -72,7 +72,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             throw new Error('Snapshot is expected to have a set of storage entries for each state root')
         }
         this._channelId = snapshot.channelId;
-        this._storageAddresses = snapshot.storageAddresses.map(addrStr => createAddressFromString(addHexPrefix(addrStr)));
+        this._storageAddresses = snapshot.storageAddresses.map(addrStr => createAddressFromString(addrStr));
         this._merkleTrees = new TokamakL2MerkleTrees(this._storageAddresses);
         await Promise.all(this._storageAddresses.map(addr => this._openAccount(addr)));
         for (const codeInfo of opts.contractCodes) {
