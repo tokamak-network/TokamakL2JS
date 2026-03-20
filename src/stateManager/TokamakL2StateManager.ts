@@ -167,6 +167,12 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
     }
 
     public get storageEntries() {return this._storageEntries}
+    public get storageAddresses(): Address[] {
+        if (this._storageAddresses === null) {
+            throw new Error('Storage addresses are not initialized.')
+        }
+        return this._storageAddresses
+    }
     public get merkleTrees(): TokamakL2MerkleTrees {
         if (this._merkleTrees === null) {
             throw new Error('Merkle trees are not initialized.')
