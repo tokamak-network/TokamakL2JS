@@ -178,7 +178,7 @@ const main = async () => {
     throw txResult.execResult.exceptionError;
   }
 
-  const outputSnapshot = await stateManager.captureStateSnapshot(inputSnapshot);
+  const outputSnapshot = await stateManager.captureStateSnapshot();
   const registeredKeySetAfter = getRegisteredKeySetForContract(outputSnapshot, contractAddress);
   const appendedKeys = [...registeredKeySetAfter]
     .filter((key) => !registeredKeySetBefore.has(key))
