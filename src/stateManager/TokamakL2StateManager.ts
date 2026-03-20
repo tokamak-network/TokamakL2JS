@@ -1,38 +1,75 @@
 import { MerkleStateManager } from "@ethereumjs/statemanager";
-import { MerkleTreeMembers, TokamakL2StateManagerOpts } from "./types.js";
+import { MerkleTreeMembers, storageKeysForAddress, TokamakL2StateManagerCommonOpts, TokamakL2StateManagerRPCOpts, TokamakL2StateManagerSnapshotOpts } from "./types.js";
 import { StateManagerInterface } from "@ethereumjs/common";
 import { IMT, IMTHashFunction, IMTMerkleProof, IMTNode } from "@zk-kit/imt"
-import { addHexPrefix, Address, bytesToBigInt, bytesToHex, concatBytes, createAccount, createAddressFromBigInt, createAddressFromString, hexToBigInt, hexToBytes, setLengthLeft } from "@ethereumjs/util";
+import { addHexPrefix, Address, bytesToBigInt, bytesToHex, concatBytes, createAccount, createAddressFromBigInt, createAddressFromString, hexToBigInt, hexToBytes, setLengthLeft, utf8ToBytes } from "@ethereumjs/util";
+import { jubjub } from "@noble/curves/misc.js";
 import { ethers } from "ethers";
 import { RLP } from "@ethereumjs/rlp";
 import { MAX_MT_LEAVES, MT_DEPTH, NULL_LEAF, POSEIDON_INPUTS } from "../interface/params/index.js";
 import { poseidon, poseidon_raw } from "../crypto/index.js";
 import { StateSnapshot, StorageEntriesJson } from "../interface/channel/types.js";
+import { ChannelStateConfig } from "../interface/configuration/types.js";
+import { deriveL2KeysFromSignature } from "../interface/wallet/index.js";
+import { fromEdwardsToAddress, getUserStorageKey } from "../utils/index.js";
 import { treeNodeToBigint } from "./utils.js";
 
 export class TokamakL2StateManager extends MerkleStateManager implements StateManagerInterface {
-    private _cachedOpts: TokamakL2StateManagerOpts | null = null
+    private _cachedOpts: TokamakL2StateManagerCommonOpts | null = null
     private _storageEntries: MerkleTreeMembers | null = null
     private _merkleTrees: TokamakL2MerkleTrees | null = null
 
-    public async initTokamakExtendsFromRPC(rpcUrl: string, opts: TokamakL2StateManagerOpts): Promise<void> {
+    public async initTokamakExtendsFromRPC(rpcUrl: string, config: ChannelStateConfig, opts: TokamakL2StateManagerRPCOpts): Promise<void> {
         if (this._cachedOpts !== null) {
             throw new Error('Cannot rewrite cached opts')
         }
         this._cachedOpts = opts;
+        const privateSignatures = config.participants.map((entry) =>
+            bytesToHex(jubjub.utils.randomPrivateKey(setLengthLeft(utf8ToBytes(entry.prvSeedL2), 32)))
+        );
+        const derivedPublicKeyListL2 = privateSignatures.map((sig) => {
+            const keySet = deriveL2KeysFromSignature(sig);
+            return jubjub.Point.fromBytes(keySet.publicKey);
+        });
+        const initStorageKeys: storageKeysForAddress[] = [];
+        for (const entryByAddress of config.storageConfigs) {
+            const keyPairs: { L1: Uint8Array; L2: Uint8Array }[] = [];
+            for (const preAllocatedKey of entryByAddress.preAllocatedKeys) {
+                const keyBytes = setLengthLeft(hexToBytes(preAllocatedKey), 32);
+                keyPairs.push({ L1: keyBytes, L2: keyBytes });
+            }
+            for (const slot of entryByAddress.userStorageSlots) {
+                for (let userIdx = 0; userIdx < config.participants.length; userIdx++) {
+                    const participant = config.participants[userIdx];
+                    const l1Key = getUserStorageKey([participant.addressL1, slot], "L1");
+                    const l2Key = getUserStorageKey(
+                        [fromEdwardsToAddress(derivedPublicKeyListL2[userIdx]), slot],
+                        "TokamakL2"
+                    );
+                    keyPairs.push({ L1: l1Key, L2: l2Key });
+                }
+            }
+            initStorageKeys.push({
+                address: createAddressFromString(entryByAddress.address),
+                keyPairs,
+            });
+        }
+        const storageAddresses = initStorageKeys.map((entry) => entry.address);
+        const callCodeAddresses = config.callCodeAddresses.map((address) => createAddressFromString(address));
 
-        await this.initTokamakExtend(opts);
-        await this.fetchStorageFromRPC(rpcUrl, opts);
+        await this.initTokamakExtend(opts, storageAddresses);
+        await this.fetchStorageFromRPC(rpcUrl, config.blockNumber, callCodeAddresses, initStorageKeys);
         await this._buildInitMerkleTrees();
     }
 
-    public async initTokamakExtendsFromSnapshot(snapshot: StateSnapshot, opts: TokamakL2StateManagerOpts): Promise<void> {
+    public async initTokamakExtendsFromSnapshot(snapshot: StateSnapshot, opts: TokamakL2StateManagerSnapshotOpts): Promise<void> {
         if (this._cachedOpts !== null) {
             throw new Error('Cannot rewrite cached opts')
         }
         this._cachedOpts = opts;
+        const storageAddresses = snapshot.storageAddresses.map((address) => createAddressFromString(address));
 
-        await this.initTokamakExtend(opts);
+        await this.initTokamakExtend(opts, storageAddresses);
         await this.fetchStorageFromSnapshot(snapshot, opts);
 
         const merkleTrees = await this._buildInitMerkleTrees();
@@ -58,7 +95,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         }
     }
 
-    async initTokamakExtend(opts: TokamakL2StateManagerOpts): Promise<void> {
+    async initTokamakExtend(opts: TokamakL2StateManagerCommonOpts, storageAddresses: Address[]): Promise<void> {
         if (opts.common.customCrypto.keccak256 === undefined) {
             throw new Error('Custom crypto must be set')
         }
@@ -68,30 +105,23 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             const contractAccount = createAccount({nonce: 0n, balance: 0n, storageRoot: POSEIDON_RLP, codeHash: POSEIDON_NULL});
             await this.putAccount(address, contractAccount);
         }
-        if (opts.storageAddresses === undefined && opts.initStorageKeys === undefined) {
+        if (storageAddresses.length === 0) {
             throw new Error('Initializing TokamakL2StateManager requires storage addresses')
         }
-        const addresses: Address[] = opts.storageAddresses ?? opts.initStorageKeys.map(entry => entry.address);
-        await Promise.all(addresses.map(addr => openAccount(addr)));
+        await Promise.all(storageAddresses.map(addr => openAccount(addr)));
     }
 
-    async fetchStorageFromRPC(rpcUrl: string, opts: TokamakL2StateManagerOpts): Promise<void> {
+    async fetchStorageFromRPC(rpcUrl: string, blockNumber: number, callCodeAddresses: Address[], initStorageKeys: storageKeysForAddress[]): Promise<void> {
         const provider = new ethers.JsonRpcProvider(rpcUrl)
-        if (opts.blockNumber === undefined ) {
-            throw new Error('Creating TokamakL2StateManager from RPC requires a block number.')
-        }
-        for (const addr of opts.callCodeAddresses) {
-            const byteCodeStr = await provider.getCode(addr.toString(), opts.blockNumber)
+        for (const addr of callCodeAddresses) {
+            const byteCodeStr = await provider.getCode(addr.toString(), blockNumber)
             await this.putCode(addr, hexToBytes(addHexPrefix(byteCodeStr)))
-        }
-        if (opts.initStorageKeys === undefined) {
-            throw new Error('Creating TokamakL2StateManager from RPC requires L1 and L2 key pairs.')
         }
         if (this._storageEntries !== null) {
             throw new Error('Cannot rewrite registered keys')
         }
         this._storageEntries = new Map();
-        for (const keysByAddress of opts.initStorageKeys) {
+        for (const keysByAddress of initStorageKeys) {
             if (await this.getAccount(keysByAddress.address) === undefined) {
                 throw new Error('TokamakL2StateManager is not initialized.')
             }
@@ -108,7 +138,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
                     throw new Error(`Duplication in L2 MPT keys.`);
                 }
 
-                const v = await provider.getStorage(keysByAddress.address.toString(), bytesToBigInt(keys.L1), opts.blockNumber);
+                const v = await provider.getStorage(keysByAddress.address.toString(), bytesToBigInt(keys.L1), blockNumber);
                 const vBytes = hexToBytes(addHexPrefix(v));
                 await this.putStorage(keysByAddress.address, keys.L2, vBytes);
 
@@ -119,7 +149,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         await this.flush();
     }
 
-    async fetchStorageFromSnapshot(snapshot: StateSnapshot, opts: TokamakL2StateManagerOpts): Promise<void> {
+    async fetchStorageFromSnapshot(snapshot: StateSnapshot, opts: TokamakL2StateManagerSnapshotOpts): Promise<void> {
         for (const codeInfo of opts.contractCodes ?? []) {
             await this.putCode(codeInfo.address, hexToBytes(codeInfo.code));
         }
