@@ -1,7 +1,7 @@
 // Usage: tsx examples/stateManager/fromStateSnapshot/create-state-manager.ts <snapshot.json>
 
 import { promises as fs } from 'fs';
-import { bigIntToHex, createAddressFromString } from '@ethereumjs/util';
+import { bigIntToHex } from '@ethereumjs/util';
 import {
   createTokamakL2Common,
   createTokamakL2StateManagerFromStateSnapshot,
@@ -20,10 +20,9 @@ const main = async () => {
 
   const stateManager = await createTokamakL2StateManagerFromStateSnapshot(snapshot, {
     common: createTokamakL2Common(),
-    storageAddresses: snapshot.storageAddresses.map((entry) => createAddressFromString(entry)),
   });
 
-  const merkleTrees = stateManager.lastMerkleTrees;
+  const merkleTrees = stateManager.merkleTrees;
   console.log('TokamakL2StateManager created from StateSnapshot.');
   console.log(`Merkle roots: ${merkleTrees.getRoots().map((root) => bigIntToHex(root))}`);
 };

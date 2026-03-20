@@ -2,7 +2,7 @@
 
 import { promises as fs } from 'fs';
 import {
-  createStateManagerOptsFromChannelConfig,
+  createTokamakL2Common,
   createTokamakL2StateManagerFromL1RPC,
   type ChannelErc20TransferTxSimulationConfig,
 } from '../../../src/index.js';
@@ -17,10 +17,11 @@ const main = async () => {
 
   const config: ChannelErc20TransferTxSimulationConfig = JSON.parse(await fs.readFile(configPath, 'utf8'));
   const rpcUrl = getRpcUrlForNetwork(config.network);
-  const stateManagerOpts = createStateManagerOptsFromChannelConfig(config);
 
-  const stateManager = await createTokamakL2StateManagerFromL1RPC(rpcUrl, stateManagerOpts);
-  const merkleTrees = stateManager.lastMerkleTrees;
+  const stateManager = await createTokamakL2StateManagerFromL1RPC(rpcUrl, config, {
+    common: createTokamakL2Common(),
+  });
+  const merkleTrees = stateManager.merkleTrees;
   console.log('TokamakL2StateManager created.');
   console.log(`Merkle roots: ${merkleTrees.getRoots().map((root) => bigIntToHex(root))}`);
 };
