@@ -73,14 +73,14 @@ const getRegisteredKeySetForContract = (
   snapshot: StateSnapshot,
   contractAddress: Address
 ): Set<bigint> => {
-  const contractIndex = snapshot.storageAddresses.findIndex((address) =>
-    createAddressFromString(address).equals(contractAddress)
+  const contractIndex = snapshot.storageAddresses.findIndex((entry) =>
+    createAddressFromString(entry).equals(contractAddress)
   );
   if (contractIndex === -1) {
     throw new Error(`Snapshot does not contain storage state for ${contractAddress.toString()}.`);
   }
   return new Set(
-    snapshot.registeredKeys[contractIndex].map((entry) =>
+    snapshot.storageEntries[contractIndex].map((entry) =>
       hexToBigInt(addHexPrefix(entry.key))
     )
   );
@@ -108,10 +108,6 @@ const main = async () => {
   }
   const common = createTokamakL2Common();
   const stateManager = await createTokamakL2StateManagerFromStateSnapshot(inputSnapshot, {
-    common,
-    storageAddresses: inputSnapshot.storageAddresses.map((address) =>
-      createAddressFromString(address)
-    ),
     contractCodes: contractCodes.map((entry) => ({
       address: createAddressFromString(entry.address),
       code: entry.code,
@@ -182,7 +178,7 @@ const main = async () => {
     throw txResult.execResult.exceptionError;
   }
 
-  const outputSnapshot = await stateManager.captureStateSnapshot(inputSnapshot);
+  const outputSnapshot = await stateManager.captureStateSnapshot();
   const registeredKeySetAfter = getRegisteredKeySetForContract(outputSnapshot, contractAddress);
   const appendedKeys = [...registeredKeySetAfter]
     .filter((key) => !registeredKeySetBefore.has(key))

@@ -1,4 +1,5 @@
 import {
+  Address,
   bytesToHex,
   createAddressFromString,
   hexToBytes,
@@ -6,11 +7,7 @@ import {
   utf8ToBytes,
 } from "@ethereumjs/util";
 import { jubjub } from "@noble/curves/misc.js";
-import { createTokamakL2Common } from "../../common/index.js";
-import {
-  storageKeysForAddress,
-  TokamakL2StateManagerOpts,
-} from "../../stateManager/types.js";
+import { TokamakL2StateManagerRPCOpts } from "../../stateManager/types.js";
 import { fromEdwardsToAddress, getUserStorageKey } from "../../utils/index.js";
 import { deriveL2KeysFromSignature } from "../wallet/index.js";
 import { ChannelStateConfig } from "./types.js";
@@ -18,7 +15,7 @@ import { ChannelStateConfig } from "./types.js";
 
 export function createStateManagerOptsFromChannelConfig(
   config: ChannelStateConfig
-): TokamakL2StateManagerOpts {
+): TokamakL2StateManagerRPCOpts {
   const privateSignatures = config.participants.map((entry) =>
     bytesToHex(jubjub.utils.randomPrivateKey(setLengthLeft(utf8ToBytes(entry.prvSeedL2), 32)))
   );
@@ -28,7 +25,10 @@ export function createStateManagerOptsFromChannelConfig(
     return jubjub.Point.fromBytes(keySet.publicKey);
   });
 
-  const initStorageKeys: storageKeysForAddress[] = [];
+  const storageConfig: {
+    address: Address;
+    keyPairs: { L1: Uint8Array; L2: Uint8Array }[];
+  }[] = [];
   for (const entryByAddress of config.storageConfigs) {
     const keyPairs: { L1: Uint8Array; L2: Uint8Array }[] = [];
     for (const preAllocatedKey of entryByAddress.preAllocatedKeys) {
@@ -49,18 +49,15 @@ export function createStateManagerOptsFromChannelConfig(
         });
       }
     }
-    initStorageKeys.push({
+    storageConfig.push({
       address: createAddressFromString(entryByAddress.address),
       keyPairs,
     });
   }
 
-  const common = createTokamakL2Common();
-
   return {
-    common,
     blockNumber: config.blockNumber,
-    initStorageKeys,
+    storageConfig,
     callCodeAddresses: config.callCodeAddresses.map((str) =>
       createAddressFromString(str)
     ),
