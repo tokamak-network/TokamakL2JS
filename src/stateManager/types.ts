@@ -22,5 +22,5 @@ export type TokamakL2StateManagerRPCOpts = {
 }
 
 export type TokamakL2StateManagerSnapshotOpts = {
-    contractCodes?: contractCodeForAddress[]
+    contractCodes: contractCodeForAddress[]
 }
