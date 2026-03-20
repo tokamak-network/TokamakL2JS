@@ -1,0 +1,31 @@
+{
+  "baseRef": "HEAD~1",
+  "headRef": "979a003",
+  "breaking": 0,
+  "additive": 0,
+  "internal": 0,
+  "details": {
+    "changedFiles": [
+      "package-lock.json",
+      "package.json"
+    ],
+    "publicCandidates": [
+      "package.json"
+    ],
+    "symbols": {
+      "previousExportCount": 42,
+      "currentExportCount": 42,
+      "removedSymbols": [],
+      "addedSymbols": []
+    },
+    "configTypes": {
+      "removedTypes": [],
+      "addedTypes": [],
+      "requiredFieldAdditions": [],
+      "optionalToRequired": [],
+      "removedRequiredFields": []
+    },
+    "breaking": [],
+    "additive": []
+  }
+}

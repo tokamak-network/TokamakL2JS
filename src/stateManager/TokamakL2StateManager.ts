@@ -9,7 +9,7 @@ import { poseidon_raw } from "../crypto/index.js";
 import { StateSnapshot, StorageEntriesJson } from "../interface/channel/types.js";
 import { treeNodeToBigint } from "./utils.js";
 import { createTokamakL2Common } from "../common/index.js";
-import { MAX_MT_LEAVES, MT_DEPTH, NULL_LEAF } from "../interface/params/stateManager.js";
+import { BLS12381_SCALAR_FIELD, MAX_MT_LEAVES, MT_DEPTH, NULL_LEAF } from "../interface/params/stateManager.js";
 import { POSEIDON_INPUTS } from "../interface/params/crypto.js";
 
 export class TokamakL2StateManager extends MerkleStateManager implements StateManagerInterface {
@@ -244,7 +244,7 @@ export class TokamakL2MerkleTrees {
             tree.update(leafIndex, NULL_LEAF);
             return null
         } else {
-            const leaf = poseidon_raw([key, value]);
+            const leaf = value % BLS12381_SCALAR_FIELD;
             tree.update(leafIndex, leaf);
             return leaf
         }

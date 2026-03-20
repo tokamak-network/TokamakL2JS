@@ -57,7 +57,7 @@ export function getUserStorageKey(parts: Array<Address | number | bigint | strin
         bytesArray.push(setLengthLeft(b, 32))
     }
     const packed = concatBytes(...bytesArray)
-    let hash
+    let hash: (input: Uint8Array) => Uint8Array
     switch (layer) {
         case 'L1': {
             hash = keccak256;

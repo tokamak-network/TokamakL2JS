@@ -1,0 +1,10 @@
+base_ref=HEAD~1
+remote_sync_exit=0
+api_exit=0
+state_exit=0
+build_exit=0
+tx_exit=0
+crypto_exit=0
+pack_exit=0
+artifact_exit=0
+semver_exit=0

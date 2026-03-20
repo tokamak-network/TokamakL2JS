@@ -1,0 +1,48 @@
+{
+  "baseRef": "HEAD~1",
+  "headRef": "de29b42",
+  "breaking": 0,
+  "additive": 0,
+  "internal": 0,
+  "details": {
+    "changedFiles": [
+      "agents/skills/.gitignore",
+      "agents/skills/l2-upgrade-public-api-guardrail/SKILL.md",
+      "agents/skills/l2-upgrade-release-readiness-guardrail/SKILL.md",
+      "agents/skills/l2-upgrade-state-invariant-guardrail/SKILL.md",
+      "agents/skills/l2-upgrade-tx-crypto-guardrail/SKILL.md",
+      "agents/tasks/todo.md",
+      "src/crypto/index.ts",
+      "src/index.ts",
+      "src/interface/configuration/utils.ts",
+      "src/stateManager/TokamakL2StateManager.ts",
+      "src/tx/TokamakL2Tx.ts",
+      "src/utils/utils.ts",
+      "src/utils/web.ts"
+    ],
+    "publicCandidates": [
+      "src/crypto/index.ts",
+      "src/index.ts",
+      "src/interface/configuration/utils.ts",
+      "src/stateManager/TokamakL2StateManager.ts",
+      "src/tx/TokamakL2Tx.ts",
+      "src/utils/utils.ts",
+      "src/utils/web.ts"
+    ],
+    "symbols": {
+      "previousExportCount": 42,
+      "currentExportCount": 42,
+      "removedSymbols": [],
+      "addedSymbols": []
+    },
+    "configTypes": {
+      "removedTypes": [],
+      "addedTypes": [],
+      "requiredFieldAdditions": [],
+      "optionalToRequired": [],
+      "removedRequiredFields": []
+    },
+    "breaking": [],
+    "additive": []
+  }
+}
