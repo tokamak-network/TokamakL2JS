@@ -1,4 +1,5 @@
 import {
+  Address,
   bytesToHex,
   createAddressFromString,
   hexToBytes,
@@ -25,8 +26,8 @@ export function createStateManagerOptsFromChannelConfig(
   });
 
   const storageConfig: {
-    address: ReturnType<typeof createAddressFromString>;
-    keyPair: { L1: Uint8Array; L2: Uint8Array }[];
+    address: Address;
+    keyPairs: { L1: Uint8Array; L2: Uint8Array }[];
   }[] = [];
   for (const entryByAddress of config.storageConfigs) {
     const keyPairs: { L1: Uint8Array; L2: Uint8Array }[] = [];
@@ -50,7 +51,7 @@ export function createStateManagerOptsFromChannelConfig(
     }
     storageConfig.push({
       address: createAddressFromString(entryByAddress.address),
-      keyPair: keyPairs,
+      keyPairs,
     });
   }
 

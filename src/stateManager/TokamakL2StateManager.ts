@@ -43,7 +43,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             const usedL1Keys = new Set<bigint>();
             const registeredL2KeyBigInts = new Set<bigint>();
             this._storageEntries.set(bytesToBigInt(address.bytes), new Map());
-            for (const keys of storageConfig.keyPair) {
+            for (const keys of storageConfig.keyPairs) {
                 const keyL1BigInt = bytesToBigInt(keys.L1);
                 const keyL2BigInt = bytesToBigInt(keys.L2);
                 if (usedL1Keys.has(keyL1BigInt)) {

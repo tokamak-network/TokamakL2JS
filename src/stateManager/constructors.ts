@@ -11,8 +11,8 @@ export async function createTokamakL2StateManagerFromL1RPC(
         throw new Error('Creating TokamakL2StateManager from RPC requires at least one call code address')
     }
     for (const storageConfig of opts.storageConfig) {
-        if (storageConfig.keyPair.length > MAX_MT_LEAVES) {
-            throw new Error(`Allowed maximum number of storage slots = ${MAX_MT_LEAVES}, but taking ${storageConfig.keyPair.length} for address ${storageConfig.address}`)
+        if (storageConfig.keyPairs.length > MAX_MT_LEAVES) {
+            throw new Error(`Allowed maximum number of storage slots = ${MAX_MT_LEAVES}, but taking ${storageConfig.keyPairs.length} for address ${storageConfig.address}`)
         }
     }
     const stateManager = new TokamakL2StateManager();

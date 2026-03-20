@@ -14,7 +14,7 @@ export type TokamakL2StateManagerRPCOpts = {
     // Multiple initStorageKeys for multiple addresses
     storageConfig: {
         address: Address,
-        keyPair: {
+        keyPairs: {
             L1: Uint8Array,
             L2: Uint8Array,
         }[],
