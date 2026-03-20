@@ -192,7 +192,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             storageEntries.push(
                 await Promise.all(
                     Array.from(currentStorageEntries.keys()).map(async (key) => {
-                        const keyBytes = bigIntToBytes(key);
+                        const keyBytes = setLengthLeft(bigIntToBytes(key), 32);
                         const value = await this.getStorage(address, keyBytes);
                         return {
                             key: bytesToHex(keyBytes),
