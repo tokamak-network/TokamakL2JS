@@ -6,11 +6,7 @@ import {
   utf8ToBytes,
 } from "@ethereumjs/util";
 import { jubjub } from "@noble/curves/misc.js";
-import { createTokamakL2Common } from "../../common/index.js";
-import {
-  storageKeysForAddress,
-  TokamakL2StateManagerRPCOpts,
-} from "../../stateManager/types.js";
+import { TokamakL2StateManagerRPCOpts } from "../../stateManager/types.js";
 import { fromEdwardsToAddress, getUserStorageKey } from "../../utils/index.js";
 import { deriveL2KeysFromSignature } from "../wallet/index.js";
 import { ChannelStateConfig } from "./types.js";
@@ -28,7 +24,7 @@ export function createStateManagerOptsFromChannelConfig(
     return jubjub.Point.fromBytes(keySet.publicKey);
   });
 
-  const initStorageKeys: storageKeysForAddress[] = [];
+  const initStorageKeys: { L1: Uint8Array; L2: Uint8Array }[][] = [];
   for (const entryByAddress of config.storageConfigs) {
     const keyPairs: { L1: Uint8Array; L2: Uint8Array }[] = [];
     for (const preAllocatedKey of entryByAddress.preAllocatedKeys) {
@@ -49,16 +45,10 @@ export function createStateManagerOptsFromChannelConfig(
         });
       }
     }
-    initStorageKeys.push({
-      address: createAddressFromString(entryByAddress.address),
-      keyPairs,
-    });
+    initStorageKeys.push(keyPairs);
   }
 
-  const common = createTokamakL2Common();
-
   return {
-    common,
     storageAddresses: config.storageConfigs.map((entry) =>
       createAddressFromString(entry.address)
     ),

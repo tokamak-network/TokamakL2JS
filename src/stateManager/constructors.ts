@@ -7,14 +7,16 @@ export async function createTokamakL2StateManagerFromL1RPC(
     rpcUrl: string,
     opts: TokamakL2StateManagerRPCOpts,
 ): Promise<TokamakL2StateManager> {
-    if (opts.initStorageKeys === undefined) {
-        throw new Error('Creating TokamakL2StateManager using StateSnapshot requires L1 and L2 key pairs.')
+    if (opts.storageAddresses.length !== opts.initStorageKeys.length) {
+        throw new Error('Creating TokamakL2StateManager from RPC requires one initStorageKeys entry per storage address.')
     }
-    if (opts.initStorageKeys.length > MAX_MT_LEAVES) {
-        throw new Error(`Allowed maximum number of storage slots = ${MAX_MT_LEAVES}, but taking ${opts.initStorageKeys.length}`)
+    for (const [idx, keyPairs] of opts.initStorageKeys.entries()) {
+        if (keyPairs.length > MAX_MT_LEAVES) {
+            throw new Error(`Allowed maximum number of storage slots = ${MAX_MT_LEAVES}, but taking ${keyPairs.length} for address ${opts.storageAddresses[idx]}`)
+        }
     }
 
-    const stateManager = new TokamakL2StateManager(opts);
+    const stateManager = new TokamakL2StateManager();
     
     await stateManager.initTokamakExtendsFromRPC(rpcUrl, opts);
     return stateManager
@@ -32,7 +34,7 @@ export async function createTokamakL2StateManagerFromStateSnapshot(
             throw new Error(`Allowed maximum number of storage slots = ${MAX_MT_LEAVES}, but taking ${storageEntriesForAddress.length} for address ${snapshot.storageAddresses[idx]}`)
         }
     }
-    const stateManager = new TokamakL2StateManager(opts);
+    const stateManager = new TokamakL2StateManager();
     
     await stateManager.initTokamakExtendsFromSnapshot(snapshot, opts);
     return stateManager
