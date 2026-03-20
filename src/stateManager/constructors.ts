@@ -1,7 +1,8 @@
 import { TokamakL2StateManagerRPCOpts, TokamakL2StateManagerSnapshotOpts } from "./types.js";
 import { TokamakL2StateManager } from "./TokamakL2StateManager.js";
-import { MAX_MT_LEAVES } from "../interface/params/index.js";
+import { MAX_MT_LEAVES } from "../interface/params/stateManager.js";
 import { StateSnapshot } from "../interface/channel/types.js";
+import { createTokamakL2Common } from "../common/index.js";
 
 export async function createTokamakL2StateManagerFromL1RPC(
     rpcUrl: string,
@@ -15,7 +16,7 @@ export async function createTokamakL2StateManagerFromL1RPC(
             throw new Error(`Allowed maximum number of storage slots = ${MAX_MT_LEAVES}, but taking ${storageConfig.keyPairs.length} for address ${storageConfig.address}`)
         }
     }
-    const stateManager = new TokamakL2StateManager();
+    const stateManager = new TokamakL2StateManager({common: createTokamakL2Common()});
     
     await stateManager.initTokamakExtendsFromRPC(rpcUrl, opts);
     return stateManager
@@ -36,7 +37,7 @@ export async function createTokamakL2StateManagerFromStateSnapshot(
             throw new Error(`Allowed maximum number of storage slots = ${MAX_MT_LEAVES}, but taking ${storageEntriesForAddress.length} for address ${snapshot.storageAddresses[idx]}`)
         }
     }
-    const stateManager = new TokamakL2StateManager();
+    const stateManager = new TokamakL2StateManager({common: createTokamakL2Common()});
     
     await stateManager.initTokamakExtendsFromSnapshot(snapshot, opts);
     return stateManager
