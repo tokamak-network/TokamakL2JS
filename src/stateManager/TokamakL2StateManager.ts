@@ -16,6 +16,8 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
     private _storageEntries: MerkleTreeMembers | null = null
     private _merkleTrees: TokamakL2MerkleTrees | null = null
     private _storageAddresses: Address[] | null = null
+    private _storageKeyLeafIndexes: Map<bigint, Map<bigint, number>> | null = null
+    private _leafIndexStorageKeys: Map<bigint, Map<number, bigint>> | null = null
     private _channelId?: number;
 
     private async _openAccount (address: Address): Promise<void> {
@@ -27,7 +29,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
     }
 
     public async initTokamakExtendsFromRPC(rpcUrl: string, opts: TokamakL2StateManagerRPCOpts): Promise<void> {
-        if (this._storageEntries !== null || this._storageAddresses !== null || this._merkleTrees !== null) {
+        if (this._storageEntries !== null || this._storageAddresses !== null || this._merkleTrees !== null || this._storageKeyLeafIndexes !== null || this._leafIndexStorageKeys !== null) {
             throw new Error('TokamakL2StateManager cannot be initialized twice')
         }
         this._storageAddresses = opts.storageConfig.map((entry) => entry.address);
@@ -40,11 +42,16 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             await this.putCode(addr, hexToBytes(addHexPrefix(byteCodeStr)))
         }
         this._storageEntries = new Map();
+        this._storageKeyLeafIndexes = new Map();
+        this._leafIndexStorageKeys = new Map();
         for (const storageConfig of opts.storageConfig) {
             const address = storageConfig.address;
             const usedL1Keys = new Set<bigint>();
             const registeredL2KeyBigInts = new Set<bigint>();
-            this._storageEntries.set(bytesToBigInt(address.bytes), new Map());
+            const addressBigInt = bytesToBigInt(address.bytes);
+            this._storageEntries.set(addressBigInt, new Map());
+            this._storageKeyLeafIndexes.set(addressBigInt, new Map());
+            this._leafIndexStorageKeys.set(addressBigInt, new Map());
             for (const keys of storageConfig.keyPairs) {
                 const keyL1BigInt = bytesToBigInt(keys.L1);
                 const keyL2BigInt = bytesToBigInt(keys.L2);
@@ -65,7 +72,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
     }
 
     public async initTokamakExtendsFromSnapshot(snapshot: StateSnapshot, opts: TokamakL2StateManagerSnapshotOpts): Promise<void> {
-        if (this._storageEntries !== null || this._storageAddresses !== null || this._merkleTrees !== null) {
+        if (this._storageEntries !== null || this._storageAddresses !== null || this._merkleTrees !== null || this._storageKeyLeafIndexes !== null || this._leafIndexStorageKeys !== null) {
             throw new Error('TokamakL2StateManager cannot be initialized twice')
         }
         if (snapshot.stateRoots.length !== snapshot.storageAddresses.length || snapshot.storageAddresses.length !== snapshot.storageEntries.length) {
@@ -80,12 +87,17 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         }
         
         this._storageEntries = new Map();
+        this._storageKeyLeafIndexes = new Map();
+        this._leafIndexStorageKeys = new Map();
         for (const [idx, addressString] of snapshot.storageAddresses.entries()) {
             if (snapshot.storageEntries[idx].length > MAX_MT_LEAVES) {
                 throw new Error(`Allowed maximum number of storage slots = ${MAX_MT_LEAVES}, but taking ${snapshot.storageEntries[idx].length} for address ${addressString}`)
             }
             const address = createAddressFromString(addressString);
-            this._storageEntries.set(bytesToBigInt(address.bytes), new Map());
+            const addressBigInt = bytesToBigInt(address.bytes);
+            this._storageEntries.set(addressBigInt, new Map());
+            this._storageKeyLeafIndexes.set(addressBigInt, new Map());
+            this._leafIndexStorageKeys.set(addressBigInt, new Map());
             for (const entry of snapshot.storageEntries[idx]) {
                 const vBytes = hexToBytes(addHexPrefix(entry.value));
                 const keyBytes = hexToBytes(addHexPrefix(entry.key));
@@ -112,9 +124,30 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         if (this._storageEntries === null) {
             throw new Error('Storage entries are not fetched')
         }
+        if (this._storageKeyLeafIndexes === null || this._leafIndexStorageKeys === null) {
+            throw new Error('Storage key leaf indexes are not initialized')
+        }
         const addressBigInt = bytesToBigInt(address.bytes);
         const keyBigInt = bytesToBigInt(key);
         const valueBigInt = bytesToBigInt(value);
+        const leafIndex = TokamakL2MerkleTrees.getLeafIndex(keyBigInt);
+        let keyLeafIndexesForAddress = this._storageKeyLeafIndexes.get(addressBigInt);
+        let leafIndexStorageKeysForAddress = this._leafIndexStorageKeys.get(addressBigInt);
+
+        if (keyLeafIndexesForAddress === undefined) {
+            keyLeafIndexesForAddress = new Map()
+            this._storageKeyLeafIndexes.set(addressBigInt, keyLeafIndexesForAddress)
+        }
+        if (leafIndexStorageKeysForAddress === undefined) {
+            leafIndexStorageKeysForAddress = new Map()
+            this._leafIndexStorageKeys.set(addressBigInt, leafIndexStorageKeysForAddress)
+        }
+
+        const registeredLeafIndex = keyLeafIndexesForAddress.get(keyBigInt);
+        const registeredStorageKey = leafIndexStorageKeysForAddress.get(leafIndex);
+        if (registeredLeafIndex === undefined && valueBigInt !== 0n && registeredStorageKey !== undefined && registeredStorageKey !== keyBigInt) {
+            throw new Error(`Leaf index collision for address ${address.toString()}: storage key ${keyBigInt.toString()} conflicts with storage key ${registeredStorageKey.toString()} at leaf index ${leafIndex}`)
+        }
 
         await super.putStorage(address, key, value);
         await this.flush();
@@ -122,10 +155,18 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
 
         let storageEntriesForAddress = this._storageEntries.get(addressBigInt)
         if (leaf === null) {
+            if (registeredLeafIndex !== undefined) {
+                keyLeafIndexesForAddress.delete(keyBigInt)
+                leafIndexStorageKeysForAddress.delete(registeredLeafIndex)
+            }
             if (storageEntriesForAddress !== undefined && storageEntriesForAddress.has(keyBigInt)) {
                 storageEntriesForAddress.delete(keyBigInt)
             }
         } else {
+            if (registeredLeafIndex === undefined) {
+                keyLeafIndexesForAddress.set(keyBigInt, leafIndex)
+                leafIndexStorageKeysForAddress.set(leafIndex, keyBigInt)
+            }
             if (storageEntriesForAddress === undefined) {
                 storageEntriesForAddress = new Map()
                 this._storageEntries.set(addressBigInt, storageEntriesForAddress)
