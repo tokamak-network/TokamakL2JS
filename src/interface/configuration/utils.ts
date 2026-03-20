@@ -24,7 +24,10 @@ export function createStateManagerOptsFromChannelConfig(
     return jubjub.Point.fromBytes(keySet.publicKey);
   });
 
-  const initStorageKeys: { L1: Uint8Array; L2: Uint8Array }[][] = [];
+  const storageConfig: {
+    address: ReturnType<typeof createAddressFromString>;
+    keyPair: { L1: Uint8Array; L2: Uint8Array }[];
+  }[] = [];
   for (const entryByAddress of config.storageConfigs) {
     const keyPairs: { L1: Uint8Array; L2: Uint8Array }[] = [];
     for (const preAllocatedKey of entryByAddress.preAllocatedKeys) {
@@ -45,15 +48,15 @@ export function createStateManagerOptsFromChannelConfig(
         });
       }
     }
-    initStorageKeys.push(keyPairs);
+    storageConfig.push({
+      address: createAddressFromString(entryByAddress.address),
+      keyPair: keyPairs,
+    });
   }
 
   return {
-    storageAddresses: config.storageConfigs.map((entry) =>
-      createAddressFromString(entry.address)
-    ),
     blockNumber: config.blockNumber,
-    initStorageKeys,
+    storageConfig,
     callCodeAddresses: config.callCodeAddresses.map((str) =>
       createAddressFromString(str)
     ),

@@ -9,14 +9,16 @@ export type contractCodeForAddress = {
 };
 
 export type TokamakL2StateManagerRPCOpts = {
-    storageAddresses: Address[],
     blockNumber: number,
     callCodeAddresses: Address[],
     // Multiple initStorageKeys for multiple addresses
-    initStorageKeys: {
-        L1: Uint8Array,
-        L2: Uint8Array,
-    }[][],
+    storageConfig: {
+        address: Address,
+        keyPair: {
+            L1: Uint8Array,
+            L2: Uint8Array,
+        }[],
+    }[],
 }
 
 export type TokamakL2StateManagerSnapshotOpts = {
