@@ -201,7 +201,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
                     })
                 )
             );
-            stateRoots.push(addHexPrefix(merkleTrees.getRoot(address).toString(16)));
+            stateRoots.push(bigIntToHex(merkleTrees.getRoot(address)));
         }
 
         return {
