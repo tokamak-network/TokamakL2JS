@@ -2,10 +2,30 @@ import { TxOptions } from "@ethereumjs/tx"
 import { TokamakL2Tx } from "./TokamakL2Tx.js"
 import { TokamakL2TxData } from "./types.js"
 import { EthereumJSErrorWithoutCode, RLP } from "@ethereumjs/rlp"
-import { Address, addHexPrefix, bytesToBigInt, hexToBytes, validateNoLeadingZeroes } from "@ethereumjs/util"
-import { ANY_LARGE_GAS_LIMIT, ANY_LARGE_GAS_PRICE } from "../interface/params/index.js"
+import { Address, addHexPrefix, bytesToBigInt, hexToBytes } from "@ethereumjs/util"
+import { ANY_LARGE_GAS_LIMIT, ANY_LARGE_GAS_PRICE, FUNCTION_INPUT_LENGTH } from "../interface/params/index.js"
 import { TxSnapshot } from "../interface/channel/types.js"
 
+const RAW_TX_FIELD_MAX_LENGTHS = {
+  nonce: 32,
+  to: 20,
+  data: 4 + FUNCTION_INPUT_LENGTH * 32,
+  senderPubKey: 32,
+  v: 1,
+  r: 32,
+  s: 32,
+} as const
+
+function validateTxDataRawMaxLengths(txDataRaw: Record<keyof typeof RAW_TX_FIELD_MAX_LENGTHS, Uint8Array>) {
+  for (const [field, maxLength] of Object.entries(RAW_TX_FIELD_MAX_LENGTHS)) {
+    const value = txDataRaw[field as keyof typeof RAW_TX_FIELD_MAX_LENGTHS]
+    if (value.length > maxLength) {
+      throw EthereumJSErrorWithoutCode(
+        `${field} exceeds maximum length ${maxLength}, received length ${value.length}`,
+      )
+    }
+  }
+}
 
 export function createTokamakL2Tx(txData: TokamakL2TxData, opts: TxOptions): TokamakL2Tx {
     if (opts.common?.customCrypto === undefined) {
@@ -34,7 +54,7 @@ export function createTokamakL2TxFromBytesArray(values: Uint8Array[], opts: TxOp
   const [nonce, to, data, senderPubKey, v, r, s] = values
 
   const txDataRaw = {nonce, to, data, senderPubKey, v, r, s}
-  validateNoLeadingZeroes(txDataRaw)
+  validateTxDataRawMaxLengths(txDataRaw)
 
   const txDataFormat: TokamakL2TxData = {
     nonce: bytesToBigInt(nonce),
