@@ -9,8 +9,9 @@ import { poseidon_raw } from "../crypto/index.js";
 import { StateSnapshot, StorageEntriesJson } from "../interface/channel/types.js";
 import { treeNodeToBigint } from "./utils.js";
 import { createTokamakL2Common } from "../common/index.js";
-import { BLS12381_SCALAR_FIELD, MAX_MT_LEAVES, MT_DEPTH, NULL_LEAF } from "../interface/params/stateManager.js";
+import { MAX_MT_LEAVES, MT_DEPTH, NULL_LEAF } from "../interface/params/stateManager.js";
 import { POSEIDON_INPUTS } from "../interface/params/crypto.js";
+import { jubjub } from "@noble/curves/misc";
 
 export class TokamakL2StateManager extends MerkleStateManager implements StateManagerInterface {
     private _storageEntries: MerkleTreeMembers | null = null
@@ -231,7 +232,7 @@ export class TokamakL2MerkleTrees {
             throw new Error(`Merkle tree is not registered for the address ${address.toString()}`);
         }
         const leafIndex = TokamakL2MerkleTrees.getLeafIndex(key);
-        const leaf = value % BLS12381_SCALAR_FIELD;
+        const leaf = value % jubjub.Point.Fp.ORDER;
         tree.update(leafIndex, leaf);
         return leaf
     }
