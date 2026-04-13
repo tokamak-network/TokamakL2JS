@@ -50,12 +50,38 @@ console.log(senderKeys.publicKey.length, recipientAddress.toString(), !!common)
   ```bash
   npx tsx examples/transaction/create-tx.ts examples/transaction/config.json
   ```
+- State manager from snapshot example:
+  [`examples/stateManager/fromStateSnapshot/create-state-manager.ts`](./examples/stateManager/fromStateSnapshot/create-state-manager.ts)
+  ```bash
+  npx tsx examples/stateManager/fromStateSnapshot/create-state-manager.ts examples/stateManager/fromStateSnapshot/snapshot.json
+  ```
 - State manager from RPC example:
   [`examples/stateManager/fromRPC/create-state-manager.ts`](./examples/stateManager/fromRPC/create-state-manager.ts)
   ```bash
   ALCHEMY_KEY=your-alchemy-key \
   npx tsx examples/stateManager/fromRPC/create-state-manager.ts examples/stateManager/fromRPC/config.json
   ```
+
+## StateSnapshot Format
+
+`StateSnapshot` stores enough data to rebuild both the Ethereum storage trie and the Tokamak storage Merkle tree without replaying slot writes.
+
+- `storageAddresses`
+  Storage-bearing contract addresses tracked by the snapshot.
+- `storageKeys[i]`
+  Original storage slot keys for `storageAddresses[i]`.
+- `storageTrieRoots[i]`
+  Ethereum storage trie roots for `storageAddresses[i]`.
+- `storageTrieDb[i]`
+  Trie-node database records for the storage trie of `storageAddresses[i]`.
+
+Important distinction:
+
+- `storageKeys` are original storage slot keys.
+- `storageTrieDb[*].key` values are trie-node database keys.
+  They are not storage slot keys.
+
+This format replaced the older `storageEntries`-based snapshot model. External consumers that construct or validate snapshots must now provide `storageKeys`, `storageTrieRoots`, and `storageTrieDb` consistently for each storage address.
 
 ## API Surface
 
