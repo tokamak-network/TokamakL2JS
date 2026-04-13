@@ -43,7 +43,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         await Promise.all(addresses.map(addr => this._openAccount(addr)))
     }
 
-    private _initializeAddressStorageMaps(address: Address): void {
+    private async _ingestStorageEntries(address: Address, entries: { key: Uint8Array, value: Uint8Array }[]): Promise<void> {
         if (this._storageEntries === null) {
             throw new Error('Storage entries are not initialized')
         }
@@ -51,14 +51,10 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             throw new Error('Storage key leaf indexes are not initialized')
         }
 
+        const registeredL2KeyBigInts = new Set<bigint>();
         const addressBigInt = bytesToBigInt(address.bytes)
         this._storageEntries.set(addressBigInt, new Map())
         this._storageKeyLeafIndexes.set(addressBigInt, new Map())
-    }
-
-    private async _ingestStorageEntries(address: Address, entries: { key: Uint8Array, value: Uint8Array }[]): Promise<void> {
-        const registeredL2KeyBigInts = new Set<bigint>();
-        this._initializeAddressStorageMaps(address)
 
         for (const entry of entries) {
             const keyBigInt = bytesToBigInt(entry.key);
