@@ -50,6 +50,7 @@
     "build": "npm run build:esm && npm run build:cjs",
     "build:esm": "tsc -p tsconfig.json",
     "build:cjs": "tsc -p tsconfig.cjs.json && node ./scripts/write-cjs-package.cjs",
+    "bench:init-from-snapshot": "node ./scripts/benchmark-init-from-snapshot.mjs",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run build"
   },
