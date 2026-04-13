@@ -5,7 +5,6 @@ import { addHexPrefix, Address, bigIntToBytes, bigIntToHex, bytesToBigInt, bytes
 import { ethers } from "ethers";
 import { RLP } from "@ethereumjs/rlp";
 import { StateSnapshot, StorageKeysJson, StorageTrieDbEntryJson } from "../interface/channel/types.js";
-import { poseidon } from "../crypto/index.js";
 import { TokamakL2MerkleTrees } from "./TokamakMerkleTrees.js";
 import { assertSnapshotStorageShape, assertStorageEntryCapacity } from "./utils.js";
 
@@ -110,8 +109,12 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
     }
 
     private async _openAccount (address: Address): Promise<void> {
-        const POSEIDON_RLP = poseidon(RLP.encode(new Uint8Array([])));
-        const POSEIDON_NULL = poseidon(new Uint8Array(0));
+        const keccak256 = this.common.customCrypto.keccak256
+        if (keccak256 === undefined) {
+            throw new Error('customCrypto.keccak256 must be defined to initialize TokamakL2StateManager accounts')
+        }
+        const POSEIDON_RLP = keccak256(RLP.encode(new Uint8Array([])));
+        const POSEIDON_NULL = keccak256(new Uint8Array(0));
         const contractAccount = createAccount({nonce: 0n, balance: 0n, storageRoot: POSEIDON_RLP, codeHash: POSEIDON_NULL});
         await this.putAccount(address, contractAccount);
     }
