@@ -24,7 +24,7 @@ export const assertSnapshotStorageShape = (snapshot: StateSnapshot): void => {
     if (
         snapshot.stateRoots.length !== addressCount ||
         snapshot.storageKeys.length !== addressCount ||
-        snapshot.storageTrieRoot.length !== addressCount ||
+        snapshot.storageTrieRoots.length !== addressCount ||
         snapshot.storageTrieDb.length !== addressCount
     ) {
         throw new Error('Snapshot is expected to have storage keys, trie roots, and trie nodes for each state root')

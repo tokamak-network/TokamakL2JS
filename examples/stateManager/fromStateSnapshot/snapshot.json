@@ -522,7 +522,7 @@
       "0x00000000000000000000000000000000000000000000000000000000000001ff"
     ]
   ],
-  "storageTrieRoot": [
+  "storageTrieRoots": [
     "0x1bd1ff46be1cae62b008c3a7ff2cc0e99edc249b88455acaa88426e4e66da6a9"
   ],
   "storageTrieDb": [

@@ -2,7 +2,7 @@ export type StateSnapshot = {
   stateRoots: string[];
   storageAddresses: string[];
   storageKeys: StorageKeysJson;
-  storageTrieRoot: string[];
+  storageTrieRoots: string[];
   storageTrieDb: StorageTrieDbJson;
   channelId: number;
 }

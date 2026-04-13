@@ -149,7 +149,7 @@ async function buildSnapshot({ depth, entryCount, TokamakSparseMerkleTree, posei
       stateRoots: [bigIntToHex(treeNodeToBigint(tree.root))],
       storageAddresses: [storageAddress],
       storageKeys: [storageKeys],
-      storageTrieRoot: [bytesToHex(storageTrie.root())],
+      storageTrieRoots: [bytesToHex(storageTrie.root())],
       storageTrieDb: [
         Array.from(storageTrie.database().db._database.entries()).map(([key, value]) => ({
           key: `0x${key}`,
@@ -274,7 +274,7 @@ function installProfiler({ timings, TokamakL2StateManager, TokamakL2MerkleTrees,
             });
 
             await measureAsync(timings, 'ingest.applyStorageRootToAccount', async () => {
-              account.storageRoot = hexToBytes(addHexPrefix(snapshot.storageTrieRoot[index]));
+              account.storageRoot = hexToBytes(addHexPrefix(snapshot.storageTrieRoots[index]));
               await this.putAccount(address, account);
             });
 

@@ -181,7 +181,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             }))
             await this._getAccountTrie().database().db.batch(trieDbOps)
 
-            account.storageRoot = hexToBytes(addHexPrefix(snapshot.storageTrieRoot[idx]))
+            account.storageRoot = hexToBytes(addHexPrefix(snapshot.storageTrieRoots[idx]))
             await this.putAccount(address, account)
 
             const storageTrie = this._getStorageTrie(address, account)
@@ -305,7 +305,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         const merkleTrees = this._getMerkleTrees();
         const storageAddresses = this._getStorageAddresses();
         const storageKeys: StorageKeysJson = [];
-        const storageTrieRoot: string[] = [];
+        const storageTrieRoots: string[] = [];
         const storageTrieDb: StorageTrieDbEntryJson[][] = [];
         const stateRoots: string[] = [];
 
@@ -327,7 +327,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
 
             const storageTrie = this._getStorageTrie(address, account)
             const currentStorageTrieRoot = bytesToHex(storageTrie.root())
-            storageTrieRoot.push(currentStorageTrieRoot)
+            storageTrieRoots.push(currentStorageTrieRoot)
             if (currentStorageTrieRoot === bytesToHex(storageTrie.EMPTY_TRIE_ROOT)) {
                 storageTrieDb.push([])
                 stateRoots.push(bigIntToHex(merkleTrees.getRoot(address)));
@@ -370,7 +370,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             stateRoots,
             storageAddresses: storageAddresses.map(addr => addr.toString()),
             storageKeys,
-            storageTrieRoot,
+            storageTrieRoots,
             storageTrieDb,
         };
     }

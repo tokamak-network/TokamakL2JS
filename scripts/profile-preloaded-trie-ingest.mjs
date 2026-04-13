@@ -128,7 +128,7 @@ async function buildPreloadedSnapshot(entryCount) {
     ],
     storageAddress,
     storageKeys,
-    storageTrieRoot: bytesToHex(trie.root()),
+    storageTrieRoots: bytesToHex(trie.root()),
     storageTrieDb,
   };
 }
@@ -139,7 +139,7 @@ async function warmUpCurrentPath(snapshotLike, createTokamakL2StateManagerFromSt
     stateRoots: ['0x' + '00'.repeat(32)],
     storageAddresses: [snapshotLike.storageAddress],
     storageKeys: [snapshotLike.storageKeys],
-    storageTrieRoot: [snapshotLike.storageTrieRoot],
+    storageTrieRoots: [snapshotLike.storageTrieRoots],
     storageTrieDb: [snapshotLike.storageTrieDb.map((entry) => ({
       key: `0x${entry.key}`,
       value: entry.value,
@@ -181,7 +181,7 @@ async function profilePreloadedPath({ payload, TokamakL2StateManager }) {
     });
 
     await measureAsync(timings, 'ingest.applyStorageRootToAccount', async () => {
-      account.storageRoot = hexToBytes(addHexPrefix(payload.storageTrieRoot));
+      account.storageRoot = hexToBytes(addHexPrefix(payload.storageTrieRoots));
       await stateManager.putAccount(storageAddress, account);
     });
 
