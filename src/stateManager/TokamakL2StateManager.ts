@@ -56,6 +56,20 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         this._storageKeyLeafIndexes.set(addressBigInt, new Map())
     }
 
+    private async _ingestStorageEntries(address: Address, entries: { key: Uint8Array, value: Uint8Array }[]): Promise<void> {
+        const registeredL2KeyBigInts = new Set<bigint>();
+        this._initializeAddressStorageMaps(address)
+
+        for (const entry of entries) {
+            const keyBigInt = bytesToBigInt(entry.key);
+            if (registeredL2KeyBigInts.has(keyBigInt)) {
+                throw new Error(`Duplication in L2 MPT keys.`);
+            }
+            await this.putStorage(address, entry.key, entry.value);
+            registeredL2KeyBigInts.add(keyBigInt);
+        }
+    }
+
     private async _openAccount (address: Address): Promise<void> {
         const POSEIDON_RLP = poseidon(RLP.encode(new Uint8Array([])));
         const POSEIDON_NULL = poseidon(new Uint8Array(0));
@@ -76,23 +90,20 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         for (const storageConfig of opts.storageConfig) {
             const address = storageConfig.address;
             const usedL1Keys = new Set<bigint>();
-            const registeredL2KeyBigInts = new Set<bigint>();
-            this._initializeAddressStorageMaps(address)
+            const storageEntriesForAddress: { key: Uint8Array, value: Uint8Array }[] = [];
             for (const keys of storageConfig.keyPairs) {
                 const keyL1BigInt = bytesToBigInt(keys.L1);
-                const keyL2BigInt = bytesToBigInt(keys.L2);
                 if (usedL1Keys.has(keyL1BigInt)) {
                     throw new Error(`Duplication in L1 MPT keys.`);
                 }
-                if (registeredL2KeyBigInts.has(keyL2BigInt)) {
-                    throw new Error(`Duplication in L2 MPT keys.`);
-                }
                 const v = await provider.getStorage(address.toString(), bytesToBigInt(keys.L1), opts.blockNumber);
-                const vBytes = hexToBytes(addHexPrefix(v));
-                await this.putStorage(address, keys.L2, vBytes);
+                storageEntriesForAddress.push({
+                    key: keys.L2,
+                    value: hexToBytes(addHexPrefix(v)),
+                });
                 usedL1Keys.add(keyL1BigInt);
-                registeredL2KeyBigInts.add(keyL2BigInt);
             }
+            await this._ingestStorageEntries(address, storageEntriesForAddress)
         }
         await this.flush();
     }
@@ -109,18 +120,10 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         for (const [idx, addressString] of snapshot.storageAddresses.entries()) {
             assertStorageEntryCapacity(snapshot.storageEntries[idx].length, addressString)
             const address = createAddressFromString(addressString);
-            const registeredL2KeyBigInts = new Set<bigint>();
-            this._initializeAddressStorageMaps(address)
-            for (const entry of snapshot.storageEntries[idx]) {
-                const vBytes = hexToBytes(addHexPrefix(entry.value));
-                const keyBytes = hexToBytes(addHexPrefix(entry.key));
-                const keyBigInt = bytesToBigInt(keyBytes);
-                if (registeredL2KeyBigInts.has(keyBigInt)) {
-                    throw new Error(`Duplication in L2 MPT keys.`);
-                }
-                await this.putStorage(address, keyBytes, vBytes);
-                registeredL2KeyBigInts.add(keyBigInt);
-            }
+            await this._ingestStorageEntries(address, snapshot.storageEntries[idx].map((entry) => ({
+                key: hexToBytes(addHexPrefix(entry.key)),
+                value: hexToBytes(addHexPrefix(entry.value)),
+            })))
         }
         await this.flush();
         const roots = this._getMerkleTrees().getRoots(storageAddresses);
