@@ -1,4 +1,4 @@
-// Usage: tsx examples/create-state-manager.ts <config.json>
+// Usage: tsx examples/stateManager/fromRPC/create-state-manager.ts <config.json>
 
 import { promises as fs } from 'fs';
 import {
@@ -12,7 +12,7 @@ import { bigIntToHex } from '@ethereumjs/util';
 const main = async () => {
   const configPath = process.argv[2];
   if (!configPath) {
-    throw new Error('Config file path required. Usage: tsx examples/create-state-manager.ts <config.json>');
+    throw new Error('Config file path required. Usage: tsx examples/stateManager/fromRPC/create-state-manager.ts <config.json>');
   }
 
   const config: ChannelErc20TransferTxSimulationConfig = JSON.parse(await fs.readFile(configPath, 'utf8'));

@@ -1,4 +1,4 @@
-// Usage: tsx examples/create-tx.ts <config.json>
+// Usage: tsx examples/transaction/create-tx.ts <config.json>
 
 import { promises as fs } from 'fs';
 import {
@@ -33,7 +33,7 @@ const hasSelectorPrefix = (calldata: `0x${string}`, selector: `0x${string}`) =>
 const main = async () => {
   const configPath = process.argv[2];
   if (!configPath) {
-    throw new Error('Config file path required. Usage: tsx examples/create-tx.ts <config.json>');
+    throw new Error('Config file path required. Usage: tsx examples/transaction/create-tx.ts <config.json>');
   }
 
   const config: TxConfig = JSON.parse(await fs.readFile(configPath, 'utf8'));
