@@ -332,7 +332,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             }
 
             let keyPrefix: Uint8Array | undefined
-            // Copy the keyPrefix derivation used by MerkleStateManager when it creates storage tries.
+            // Copy the keyPrefix derivation used by @ethereumjs/statemanager v10.1.1 MerkleStateManager when it creates storage tries.
             if (this._prefixStorageTrieKeys) {
                 const keccak256 = this.common.customCrypto.keccak256
                 if (keccak256 === undefined) {
