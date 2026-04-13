@@ -262,9 +262,10 @@ function installProfiler({ timings, TokamakL2StateManager, TokamakL2MerkleTrees,
           await measureAsync(timings, 'ingest.storageTrieWrites', async () => {
             for (const entry of normalizedEntries) {
               if (entry.value.length === 0) {
-                await storageTrie.del(entry.key);
+                await measureAsync(timings, 'ingest.storageTrieDelete', () => storageTrie.del(entry.key));
               } else {
-                await storageTrie.put(entry.key, RLP.encode(entry.value));
+                const encodedValue = measureSync(timings, 'ingest.storageTrieRlpEncode', () => RLP.encode(entry.value));
+                await measureAsync(timings, 'ingest.storageTriePut', () => storageTrie.put(entry.key, encodedValue));
               }
             }
           });
