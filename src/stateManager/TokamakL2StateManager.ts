@@ -1,13 +1,13 @@
 import { MerkleStateManager } from "@ethereumjs/statemanager";
 import { MerkleTreeMembers, TokamakL2StateManagerRPCOpts, TokamakL2StateManagerSnapshotOpts } from "./types.js";
 import { StateManagerInterface } from "@ethereumjs/common";
-import { addHexPrefix, Address, bigIntToBytes, bigIntToHex, bytesToBigInt, bytesToHex, concatBytes, createAccount, createAddressFromBigInt, createAddressFromString, hexToBigInt, hexToBytes, setLengthLeft } from "@ethereumjs/util";
+import { addHexPrefix, Address, bigIntToBytes, bigIntToHex, bytesToBigInt, bytesToHex, createAccount, createAddressFromString, hexToBigInt, hexToBytes, setLengthLeft } from "@ethereumjs/util";
 import { ethers } from "ethers";
 import { RLP } from "@ethereumjs/rlp";
 import { StateSnapshot, StorageEntriesJson } from "../interface/channel/types.js";
-import { createTokamakL2Common } from "../common/index.js";
-import { MAX_MT_LEAVES } from "../interface/params/stateManager.js";
+import { poseidon } from "../crypto/index.js";
 import { TokamakL2MerkleTrees } from "./TokamakMerkleTrees.js";
+import { assertSnapshotStorageShape, assertStorageEntryCapacity } from "./utils.js";
 
 export class TokamakL2StateManager extends MerkleStateManager implements StateManagerInterface {
     private _storageEntries: MerkleTreeMembers | null = null
@@ -15,17 +15,6 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
     private _storageAddresses: Address[] | null = null
     private _storageKeyLeafIndexes: Map<bigint, Map<bigint, number>> | null = null
     private _channelId?: number;
-
-    private _getKeccak256() {
-        const common = createTokamakL2Common();
-        const keccak256 = common.customCrypto.keccak256;
-
-        if (keccak256 == null) {
-            throw new Error('TokamakL2Common.customCrypto.keccak256 is not configured.')
-        }
-
-        return keccak256
-    }
 
     private _getStorageAddresses(): Address[] {
         if (this._storageAddresses == null) {
@@ -43,37 +32,60 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         return this._merkleTrees
     }
 
+    private _assertNotInitialized(): void {
+        if (this._storageEntries !== null || this._storageAddresses !== null || this._merkleTrees !== null || this._storageKeyLeafIndexes !== null) {
+            throw new Error('TokamakL2StateManager cannot be initialized twice')
+        }
+    }
+
+    private _initializeStorageContext(addresses: Address[]): void {
+        this._storageAddresses = addresses
+        this._merkleTrees = new TokamakL2MerkleTrees(addresses)
+        this._storageEntries = new Map()
+        this._storageKeyLeafIndexes = new Map()
+    }
+
+    private async _openTrackedAccounts(): Promise<void> {
+        await Promise.all(this._getStorageAddresses().map(addr => this._openAccount(addr)))
+    }
+
+    private _initializeAddressStorageMaps(address: Address): void {
+        if (this._storageEntries === null) {
+            throw new Error('Storage entries are not initialized')
+        }
+        if (this._storageKeyLeafIndexes === null) {
+            throw new Error('Storage key leaf indexes are not initialized')
+        }
+
+        const addressBigInt = bytesToBigInt(address.bytes)
+        this._storageEntries.set(addressBigInt, new Map())
+        this._storageKeyLeafIndexes.set(addressBigInt, new Map())
+    }
+
     private async _openAccount (address: Address): Promise<void> {
-        const keccak256 = this._getKeccak256();
-        const POSEIDON_RLP = keccak256(RLP.encode(new Uint8Array([])));
-        const POSEIDON_NULL = keccak256(new Uint8Array(0));
+        const POSEIDON_RLP = poseidon(RLP.encode(new Uint8Array([])));
+        const POSEIDON_NULL = poseidon(new Uint8Array(0));
         const contractAccount = createAccount({nonce: 0n, balance: 0n, storageRoot: POSEIDON_RLP, codeHash: POSEIDON_NULL});
         await this.putAccount(address, contractAccount);
     }
 
     public async initTokamakExtendsFromRPC(rpcUrl: string, opts: TokamakL2StateManagerRPCOpts): Promise<void> {
-        if (this._storageEntries !== null || this._storageAddresses !== null || this._merkleTrees !== null || this._storageKeyLeafIndexes !== null) {
-            throw new Error('TokamakL2StateManager cannot be initialized twice')
+        this._assertNotInitialized()
+        for (const storageConfig of opts.storageConfig) {
+            assertStorageEntryCapacity(storageConfig.keyPairs.length, storageConfig.address.toString())
         }
-        this._storageAddresses = opts.storageConfig.map((entry) => entry.address);
-        const storageAddresses = this._getStorageAddresses();
-        this._merkleTrees = new TokamakL2MerkleTrees(storageAddresses);
-        
-        await Promise.all(storageAddresses.map(addr => this._openAccount(addr)));
+        this._initializeStorageContext(opts.storageConfig.map((entry) => entry.address))
+        await this._openTrackedAccounts()
         const provider = new ethers.JsonRpcProvider(rpcUrl)
         for (const addr of opts.callCodeAddresses) {
             const byteCodeStr = await provider.getCode(addr.toString(), opts.blockNumber)
             await this.putCode(addr, hexToBytes(addHexPrefix(byteCodeStr)))
         }
-        this._storageEntries = new Map();
-        this._storageKeyLeafIndexes = new Map();
         for (const storageConfig of opts.storageConfig) {
             const address = storageConfig.address;
             const usedL1Keys = new Set<bigint>();
             const registeredL2KeyBigInts = new Set<bigint>();
-            const addressBigInt = bytesToBigInt(address.bytes);
-            this._storageEntries.set(addressBigInt, new Map());
-            this._storageKeyLeafIndexes.set(addressBigInt, new Map());
+            this._initializeAddressStorageMaps(address)
             for (const keys of storageConfig.keyPairs) {
                 const keyL1BigInt = bytesToBigInt(keys.L1);
                 const keyL2BigInt = bytesToBigInt(keys.L2);
@@ -94,31 +106,20 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
     }
 
     public async initTokamakExtendsFromSnapshot(snapshot: StateSnapshot, opts: TokamakL2StateManagerSnapshotOpts): Promise<void> {
-        if (this._storageEntries !== null || this._storageAddresses !== null || this._merkleTrees !== null || this._storageKeyLeafIndexes !== null) {
-            throw new Error('TokamakL2StateManager cannot be initialized twice')
-        }
-        if (snapshot.stateRoots.length !== snapshot.storageAddresses.length || snapshot.storageAddresses.length !== snapshot.storageEntries.length) {
-            throw new Error('Snapshot is expected to have a set of storage entries for each state root')
-        }
+        this._assertNotInitialized()
+        assertSnapshotStorageShape(snapshot)
         this._channelId = snapshot.channelId;
-        this._storageAddresses = snapshot.storageAddresses.map(addrStr => createAddressFromString(addrStr));
-        const storageAddresses = this._getStorageAddresses();
-        this._merkleTrees = new TokamakL2MerkleTrees(storageAddresses);
-        await Promise.all(storageAddresses.map(addr => this._openAccount(addr)));
+        const storageAddresses = snapshot.storageAddresses.map(addrStr => createAddressFromString(addrStr))
+        this._initializeStorageContext(storageAddresses)
+        await this._openTrackedAccounts()
         for (const codeInfo of opts.contractCodes) {
             await this.putCode(codeInfo.address, hexToBytes(codeInfo.code));
         }
         
-        this._storageEntries = new Map();
-        this._storageKeyLeafIndexes = new Map();
         for (const [idx, addressString] of snapshot.storageAddresses.entries()) {
-            if (snapshot.storageEntries[idx].length > MAX_MT_LEAVES) {
-                throw new Error(`Allowed maximum number of storage slots = ${MAX_MT_LEAVES}, but taking ${snapshot.storageEntries[idx].length} for address ${addressString}`)
-            }
+            assertStorageEntryCapacity(snapshot.storageEntries[idx].length, addressString)
             const address = createAddressFromString(addressString);
-            const addressBigInt = bytesToBigInt(address.bytes);
-            this._storageEntries.set(addressBigInt, new Map());
-            this._storageKeyLeafIndexes.set(addressBigInt, new Map());
+            this._initializeAddressStorageMaps(address)
             for (const entry of snapshot.storageEntries[idx]) {
                 const vBytes = hexToBytes(addHexPrefix(entry.value));
                 const keyBytes = hexToBytes(addHexPrefix(entry.key));
@@ -168,7 +169,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
 
         await super.putStorage(address, key, value);
         await this.flush();
-        const leaf = merkleTrees.update(addressBigInt, keyBigInt, valueBigInt);
+        merkleTrees.update(addressBigInt, keyBigInt, valueBigInt);
 
         let storageEntriesForAddress = this._storageEntries.get(addressBigInt)
         if (registeredLeafIndex === undefined) {

@@ -1,4 +1,3 @@
-import { Common } from "@ethereumjs/common";
 import { Address } from "@ethereumjs/util";
 
 export type MerkleTreeMembers = Map<bigint, Map<bigint, bigint>>;   // Map<address, Map<storageKey, value>>

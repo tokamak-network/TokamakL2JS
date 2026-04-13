@@ -1,5 +1,7 @@
 import { IMTNode } from "@zk-kit/imt";
 import { addHexPrefix, hexToBigInt } from "@ethereumjs/util";
+import { StateSnapshot } from "../interface/channel/types.js";
+import { MAX_MT_LEAVES } from "../interface/params/stateManager.js";
 
 export const treeNodeToBigint = (node: IMTNode): bigint => {
     if (typeof node === "bigint") {
@@ -10,3 +12,15 @@ export const treeNodeToBigint = (node: IMTNode): bigint => {
     }
     return BigInt(node);
 };
+
+export const assertStorageEntryCapacity = (entryCount: number, address: string): void => {
+    if (entryCount > MAX_MT_LEAVES) {
+        throw new Error(`Allowed maximum number of storage slots = ${MAX_MT_LEAVES}, but taking ${entryCount} for address ${address}`)
+    }
+}
+
+export const assertSnapshotStorageShape = (snapshot: StateSnapshot): void => {
+    if (snapshot.stateRoots.length !== snapshot.storageAddresses.length || snapshot.storageAddresses.length !== snapshot.storageEntries.length) {
+        throw new Error('Snapshot is expected to have a set of storage entries for each state root')
+    }
+}
