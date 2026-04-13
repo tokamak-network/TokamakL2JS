@@ -171,7 +171,6 @@ function installProfiler({ timings, TokamakL2StateManager, TokamakL2MerkleTrees,
   const originals = {
     initTokamakExtendsFromSnapshot: prototype.initTokamakExtendsFromSnapshot,
     _initializeForAddresses: prototype._initializeForAddresses,
-    _ingestSnapshotStorageTrie: prototype._ingestSnapshotStorageTrie,
     _openAccount: prototype._openAccount,
     putCode: prototype.putCode,
     flush: prototype.flush,
@@ -217,89 +216,6 @@ function installProfiler({ timings, TokamakL2StateManager, TokamakL2MerkleTrees,
     });
   };
 
-  prototype._ingestSnapshotStorageTrie = async function patchedIngestStorageTrie(address, storageKeys, storageTrieRoot, storageTrieDb) {
-    return measureAsync(timings, 'ingest.total', async () => {
-      measureSync(timings, 'ingest.guardChecks', () => {
-        if (this._storageEntries === null) {
-          throw new Error('Storage entries are not initialized');
-        }
-        if (this._storageKeyLeafIndexes === null) {
-          throw new Error('Storage key leaf indexes are not initialized');
-        }
-        if (this._storageLeafIndexKeys === null) {
-          throw new Error('Storage leaf index keys are not initialized');
-        }
-      });
-
-      const merkleTrees = measureSync(timings, 'ingest.getMerkleTrees', () => this._getMerkleTrees());
-      const account = await measureAsync(timings, 'ingest.getAccount', () => this.getAccount(address));
-      if (account === undefined) {
-        throw new Error(`Cannot initialize storage for missing account ${address.toString()}`);
-      }
-
-      const addressBigInt = measureSync(timings, 'ingest.computeAddressBigInt', () => bytesToBigInt(address.bytes));
-      const storageEntriesForAddress = new Map();
-      const keyLeafIndexesForAddress = new Map();
-      const leafIndexKeysForAddress = new Map();
-      const normalizedEntries = [];
-
-      await measureAsync(timings, 'ingest.preloadTrieDb', async () => {
-        const trieDbOps = storageTrieDb.map((entry) => ({
-          type: 'put',
-          key: hexToBytes(addHexPrefix(entry.key)),
-          value: hexToBytes(addHexPrefix(entry.value)),
-        }));
-        await this._getAccountTrie().database().db.batch(trieDbOps);
-      });
-
-      await measureAsync(timings, 'ingest.applyStorageRootToAccount', async () => {
-        account.storageRoot = hexToBytes(addHexPrefix(storageTrieRoot));
-        await this.putAccount(address, account);
-      });
-
-      const storageTrie = measureSync(timings, 'ingest.getStorageTrie', () => this._getStorageTrie(address, account));
-
-      await measureAsync(timings, 'ingest.readValuesFromTrie', async () => {
-        for (const keyHex of storageKeys) {
-          const key = hexToBytes(addHexPrefix(keyHex));
-          const keyBigInt = bytesToBigInt(key);
-          if (keyLeafIndexesForAddress.has(keyBigInt)) {
-            throw new Error('Duplication in L2 MPT keys.');
-          }
-          const leafIndex = TokamakL2MerkleTrees.getLeafIndex(keyBigInt);
-          const conflictingKey = leafIndexKeysForAddress.get(leafIndex);
-          if (conflictingKey !== undefined && conflictingKey !== keyBigInt) {
-            throw new Error(`Leaf index collision for address ${address.toString()}: storage key ${keyBigInt.toString()} conflicts with storage key ${conflictingKey.toString()} at leaf index ${leafIndex}`);
-          }
-
-          const encodedValue = await storageTrie.get(key);
-          const decodedValue = encodedValue === null ? new Uint8Array() : RLP.decode(encodedValue);
-          const normalizedValue = unpadBytes(decodedValue);
-          const valueBigInt = normalizedValue.length === 0 ? 0n : bytesToBigInt(normalizedValue);
-          normalizedEntries.push({
-            keyBigInt,
-            valueBigInt,
-          });
-          storageEntriesForAddress.set(keyBigInt, valueBigInt);
-          keyLeafIndexesForAddress.set(keyBigInt, leafIndex);
-          leafIndexKeysForAddress.set(leafIndex, keyBigInt);
-        }
-      });
-
-      measureSync(timings, 'ingest.commitMetadataMaps', () => {
-        this._storageEntries.set(addressBigInt, storageEntriesForAddress);
-        this._storageKeyLeafIndexes.set(addressBigInt, keyLeafIndexesForAddress);
-        this._storageLeafIndexKeys.set(addressBigInt, leafIndexKeysForAddress);
-      });
-
-      measureSync(timings, 'ingest.updateMerkleTrees', () => {
-        for (const entry of normalizedEntries) {
-          merkleTrees.update(addressBigInt, entry.keyBigInt, entry.valueBigInt);
-        }
-      });
-    });
-  };
-
   prototype.initTokamakExtendsFromSnapshot = async function patchedInitFromSnapshot(snapshot, opts) {
     return measureAsync(timings, 'snapshot.total', async () => {
       measureSync(timings, 'snapshot.assertShape', () => {
@@ -329,12 +245,82 @@ function installProfiler({ timings, TokamakL2StateManager, TokamakL2MerkleTrees,
           });
 
           const address = measureSync(timings, 'snapshot.decodeStorageAddress', () => createAddressFromString(addressString));
-          await this._ingestSnapshotStorageTrie(
-            address,
-            snapshot.storageKeys[index],
-            snapshot.storageTrieRoot[index],
-            snapshot.storageTrieDb[index]
-          );
+          await measureAsync(timings, 'ingest.total', async () => {
+            measureSync(timings, 'ingest.guardChecks', () => {
+              if (this._storageEntries === null) {
+                throw new Error('Storage entries are not initialized');
+              }
+              if (this._storageKeyLeafIndexes === null) {
+                throw new Error('Storage key leaf indexes are not initialized');
+              }
+              if (this._storageLeafIndexKeys === null) {
+                throw new Error('Storage leaf index keys are not initialized');
+              }
+            });
+
+            const merkleTrees = measureSync(timings, 'ingest.getMerkleTrees', () => this._getMerkleTrees());
+            const account = await measureAsync(timings, 'ingest.getAccount', () => this.getAccount(address));
+            if (account === undefined) {
+              throw new Error(`Cannot initialize storage for missing account ${address.toString()}`);
+            }
+
+            await measureAsync(timings, 'ingest.preloadTrieDb', async () => {
+              const trieDbOps = snapshot.storageTrieDb[index].map((entry) => ({
+                type: 'put',
+                key: addHexPrefix(entry.key).slice(2),
+                value: hexToBytes(addHexPrefix(entry.value)),
+              }));
+              await this._getAccountTrie().database().db.batch(trieDbOps);
+            });
+
+            await measureAsync(timings, 'ingest.applyStorageRootToAccount', async () => {
+              account.storageRoot = hexToBytes(addHexPrefix(snapshot.storageTrieRoot[index]));
+              await this.putAccount(address, account);
+            });
+
+            const storageTrie = measureSync(timings, 'ingest.getStorageTrie', () => this._getStorageTrie(address, account));
+            const addressBigInt = measureSync(timings, 'ingest.computeAddressBigInt', () => bytesToBigInt(address.bytes));
+            const storageEntriesForAddress = new Map();
+            const keyLeafIndexesForAddress = new Map();
+            const leafIndexKeysForAddress = new Map();
+            const normalizedEntries = [];
+
+            await measureAsync(timings, 'ingest.readValuesFromTrie', async () => {
+              for (const keyHex of snapshot.storageKeys[index]) {
+                const key = hexToBytes(addHexPrefix(keyHex));
+                const keyBigInt = bytesToBigInt(key);
+                if (keyLeafIndexesForAddress.has(keyBigInt)) {
+                  throw new Error('Duplication in L2 MPT keys.');
+                }
+                const leafIndex = TokamakL2MerkleTrees.getLeafIndex(keyBigInt);
+                const conflictingKey = leafIndexKeysForAddress.get(leafIndex);
+                if (conflictingKey !== undefined && conflictingKey !== keyBigInt) {
+                  throw new Error(`Leaf index collision for address ${address.toString()}: storage key ${keyBigInt.toString()} conflicts with storage key ${conflictingKey.toString()} at leaf index ${leafIndex}`);
+                }
+
+                const encodedValue = await storageTrie.get(key);
+                const decodedValue = encodedValue === null ? new Uint8Array() : RLP.decode(encodedValue);
+                const normalizedValue = unpadBytes(decodedValue);
+                const valueBigInt = normalizedValue.length === 0 ? 0n : bytesToBigInt(normalizedValue);
+                storageEntriesForAddress.set(keyBigInt, valueBigInt);
+                keyLeafIndexesForAddress.set(keyBigInt, leafIndex);
+                leafIndexKeysForAddress.set(leafIndex, keyBigInt);
+                normalizedEntries.push({ keyBigInt, valueBigInt });
+              }
+            });
+
+            measureSync(timings, 'ingest.commitMetadataMaps', () => {
+              this._storageEntries.set(addressBigInt, storageEntriesForAddress);
+              this._storageKeyLeafIndexes.set(addressBigInt, keyLeafIndexesForAddress);
+              this._storageLeafIndexKeys.set(addressBigInt, leafIndexKeysForAddress);
+            });
+
+            measureSync(timings, 'ingest.updateMerkleTrees', () => {
+              for (const entry of normalizedEntries) {
+                merkleTrees.update(addressBigInt, entry.keyBigInt, entry.valueBigInt);
+              }
+            });
+          });
         }
       });
 
@@ -358,7 +344,6 @@ function installProfiler({ timings, TokamakL2StateManager, TokamakL2MerkleTrees,
   return () => {
     prototype.initTokamakExtendsFromSnapshot = originals.initTokamakExtendsFromSnapshot;
     prototype._initializeForAddresses = originals._initializeForAddresses;
-    prototype._ingestSnapshotStorageTrie = originals._ingestSnapshotStorageTrie;
     prototype._openAccount = originals._openAccount;
     prototype.putCode = originals.putCode;
     prototype.flush = originals.flush;

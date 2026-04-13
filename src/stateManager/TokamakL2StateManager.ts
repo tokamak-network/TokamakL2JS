@@ -111,120 +111,6 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         }
     }
 
-    private async _ingestSnapshotStorageTrie(
-        address: Address,
-        storageKeys: string[],
-        storageTrieRoot: string,
-        storageTrieDb: StorageTrieDbEntryJson[],
-    ): Promise<void> {
-        if (this._storageEntries === null) {
-            throw new Error('Storage entries are not initialized')
-        }
-        if (this._storageKeyLeafIndexes === null) {
-            throw new Error('Storage key leaf indexes are not initialized')
-        }
-        if (this._storageLeafIndexKeys === null) {
-            throw new Error('Storage leaf index keys are not initialized')
-        }
-
-        const merkleTrees = this._getMerkleTrees()
-        const account = await this.getAccount(address)
-        if (account === undefined) {
-            throw new Error(`Cannot initialize storage for missing account ${address.toString()}`)
-        }
-
-        const trieDbOps = storageTrieDb.map((entry) => ({
-            type: 'put' as const,
-            key: addHexPrefix(entry.key).slice(2),
-            value: hexToBytes(addHexPrefix(entry.value)),
-        }))
-        await this._getAccountTrie().database().db.batch(trieDbOps)
-
-        account.storageRoot = hexToBytes(addHexPrefix(storageTrieRoot))
-        await this.putAccount(address, account)
-
-        const storageTrie = this._getStorageTrie(address, account)
-        const addressBigInt = bytesToBigInt(address.bytes)
-        const storageEntriesForAddress = new Map<bigint, bigint>()
-        const keyLeafIndexesForAddress = new Map<bigint, number>()
-        const leafIndexKeysForAddress = new Map<number, bigint>()
-        const normalizedEntries: { keyBigInt: bigint, valueBigInt: bigint }[] = []
-
-        for (const keyHex of storageKeys) {
-            const key = hexToBytes(addHexPrefix(keyHex))
-            const keyBigInt = bytesToBigInt(key)
-            if (keyLeafIndexesForAddress.has(keyBigInt)) {
-                throw new Error(`Duplication in L2 MPT keys.`)
-            }
-
-            const leafIndex = TokamakL2MerkleTrees.getLeafIndex(keyBigInt)
-            const conflictingKey = leafIndexKeysForAddress.get(leafIndex)
-            if (conflictingKey !== undefined && conflictingKey !== keyBigInt) {
-                throw new Error(`Leaf index collision for address ${address.toString()}: storage key ${keyBigInt.toString()} conflicts with storage key ${conflictingKey.toString()} at leaf index ${leafIndex}`)
-            }
-
-            const encodedValue = await storageTrie.get(key)
-            const decodedValue = encodedValue === null ? new Uint8Array() : RLP.decode(encodedValue) as Uint8Array
-            const normalizedValue = unpadBytes(decodedValue)
-            const valueBigInt = normalizedValue.length === 0 ? 0n : bytesToBigInt(normalizedValue)
-
-            storageEntriesForAddress.set(keyBigInt, valueBigInt)
-            keyLeafIndexesForAddress.set(keyBigInt, leafIndex)
-            leafIndexKeysForAddress.set(leafIndex, keyBigInt)
-            normalizedEntries.push({ keyBigInt, valueBigInt })
-        }
-
-        this._storageEntries.set(addressBigInt, storageEntriesForAddress)
-        this._storageKeyLeafIndexes.set(addressBigInt, keyLeafIndexesForAddress)
-        this._storageLeafIndexKeys.set(addressBigInt, leafIndexKeysForAddress)
-
-        for (const entry of normalizedEntries) {
-            merkleTrees.update(addressBigInt, entry.keyBigInt, entry.valueBigInt)
-        }
-    }
-
-    private async _captureStorageTrie(address: Address): Promise<{ storageTrieRoot: string, storageTrieDb: StorageTrieDbEntryJson[] }> {
-        const account = await this.getAccount(address)
-        if (account === undefined) {
-            throw new Error(`Cannot capture storage trie for missing account ${address.toString()}`)
-        }
-
-        const storageTrie = this._getStorageTrie(address, account)
-        const storageTrieRoot = bytesToHex(storageTrie.root())
-        if (storageTrieRoot === bytesToHex(storageTrie.EMPTY_TRIE_ROOT)) {
-            return { storageTrieRoot, storageTrieDb: [] }
-        }
-
-        const keyPrefix = (storageTrie as unknown as { _opts: { keyPrefix?: Uint8Array } })._opts.keyPrefix
-        const storageTrieDb: StorageTrieDbEntryJson[] = []
-        const seen = new Set<string>()
-
-        for await (const { node, currentKey } of storageTrie.walkTrieIterable(storageTrie.root())) {
-            const encoded = node.serialize()
-            const isRoot = currentKey.length === 0
-            if (!isRoot && encoded.length < 32) {
-                continue
-            }
-
-            let dbKey = isRoot ? storageTrie.root() : (storageTrie as unknown as { hash: (msg: Uint8Array) => Uint8Array }).hash(encoded)
-            if (keyPrefix !== undefined) {
-                dbKey = concatBytes(keyPrefix, dbKey)
-            }
-
-            const keyHex = bytesToHex(dbKey)
-            if (seen.has(keyHex)) {
-                continue
-            }
-            seen.add(keyHex)
-            storageTrieDb.push({
-                key: keyHex,
-                value: bytesToHex(encoded),
-            })
-        }
-
-        return { storageTrieRoot, storageTrieDb }
-    }
-
     private async _openAccount (address: Address): Promise<void> {
         const POSEIDON_RLP = poseidon(RLP.encode(new Uint8Array([])));
         const POSEIDON_NULL = poseidon(new Uint8Array(0));
@@ -275,12 +161,70 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         for (const [idx, addressString] of snapshot.storageAddresses.entries()) {
             assertStorageEntryCapacity(snapshot.storageKeys[idx].length, addressString)
             const address = createAddressFromString(addressString);
-            await this._ingestSnapshotStorageTrie(
-                address,
-                snapshot.storageKeys[idx],
-                snapshot.storageTrieRoot[idx],
-                snapshot.storageTrieDb[idx],
-            )
+            if (this._storageEntries === null) {
+                throw new Error('Storage entries are not initialized')
+            }
+            if (this._storageKeyLeafIndexes === null) {
+                throw new Error('Storage key leaf indexes are not initialized')
+            }
+            if (this._storageLeafIndexKeys === null) {
+                throw new Error('Storage leaf index keys are not initialized')
+            }
+
+            const merkleTrees = this._getMerkleTrees()
+            const account = await this.getAccount(address)
+            if (account === undefined) {
+                throw new Error(`Cannot initialize storage for missing account ${address.toString()}`)
+            }
+
+            const trieDbOps = snapshot.storageTrieDb[idx].map((entry) => ({
+                type: 'put' as const,
+                key: addHexPrefix(entry.key).slice(2),
+                value: hexToBytes(addHexPrefix(entry.value)),
+            }))
+            await this._getAccountTrie().database().db.batch(trieDbOps)
+
+            account.storageRoot = hexToBytes(addHexPrefix(snapshot.storageTrieRoot[idx]))
+            await this.putAccount(address, account)
+
+            const storageTrie = this._getStorageTrie(address, account)
+            const addressBigInt = bytesToBigInt(address.bytes)
+            const storageEntriesForAddress = new Map<bigint, bigint>()
+            const keyLeafIndexesForAddress = new Map<bigint, number>()
+            const leafIndexKeysForAddress = new Map<number, bigint>()
+            const normalizedEntries: { keyBigInt: bigint, valueBigInt: bigint }[] = []
+
+            for (const keyHex of snapshot.storageKeys[idx]) {
+                const key = hexToBytes(addHexPrefix(keyHex))
+                const keyBigInt = bytesToBigInt(key)
+                if (keyLeafIndexesForAddress.has(keyBigInt)) {
+                    throw new Error(`Duplication in L2 MPT keys.`)
+                }
+
+                const leafIndex = TokamakL2MerkleTrees.getLeafIndex(keyBigInt)
+                const conflictingKey = leafIndexKeysForAddress.get(leafIndex)
+                if (conflictingKey !== undefined && conflictingKey !== keyBigInt) {
+                    throw new Error(`Leaf index collision for address ${address.toString()}: storage key ${keyBigInt.toString()} conflicts with storage key ${conflictingKey.toString()} at leaf index ${leafIndex}`)
+                }
+
+                const encodedValue = await storageTrie.get(key)
+                const decodedValue = encodedValue === null ? new Uint8Array() : RLP.decode(encodedValue) as Uint8Array
+                const normalizedValue = unpadBytes(decodedValue)
+                const valueBigInt = normalizedValue.length === 0 ? 0n : bytesToBigInt(normalizedValue)
+
+                storageEntriesForAddress.set(keyBigInt, valueBigInt)
+                keyLeafIndexesForAddress.set(keyBigInt, leafIndex)
+                leafIndexKeysForAddress.set(leafIndex, keyBigInt)
+                normalizedEntries.push({ keyBigInt, valueBigInt })
+            }
+
+            this._storageEntries.set(addressBigInt, storageEntriesForAddress)
+            this._storageKeyLeafIndexes.set(addressBigInt, keyLeafIndexesForAddress)
+            this._storageLeafIndexKeys.set(addressBigInt, leafIndexKeysForAddress)
+
+            for (const entry of normalizedEntries) {
+                merkleTrees.update(addressBigInt, entry.keyBigInt, entry.valueBigInt)
+            }
         }
         await this.flush();
         const roots = this._getMerkleTrees().getRoots(storageAddresses);
@@ -379,9 +323,48 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
                     bytesToHex(setLengthLeft(bigIntToBytes(key), 32))
                 )
             );
-            const storageTrieSnapshot = await this._captureStorageTrie(address)
-            storageTrieRoot.push(storageTrieSnapshot.storageTrieRoot)
-            storageTrieDb.push(storageTrieSnapshot.storageTrieDb)
+            const account = await this.getAccount(address)
+            if (account === undefined) {
+                throw new Error(`Cannot capture storage trie for missing account ${address.toString()}`)
+            }
+
+            const storageTrie = this._getStorageTrie(address, account)
+            const currentStorageTrieRoot = bytesToHex(storageTrie.root())
+            storageTrieRoot.push(currentStorageTrieRoot)
+            if (currentStorageTrieRoot === bytesToHex(storageTrie.EMPTY_TRIE_ROOT)) {
+                storageTrieDb.push([])
+                stateRoots.push(bigIntToHex(merkleTrees.getRoot(address)));
+                continue
+            }
+
+            const keyPrefix = (storageTrie as unknown as { _opts: { keyPrefix?: Uint8Array } })._opts.keyPrefix
+            const currentStorageTrieDb: StorageTrieDbEntryJson[] = []
+            const seen = new Set<string>()
+
+            for await (const { node, currentKey } of storageTrie.walkTrieIterable(storageTrie.root())) {
+                const encoded = node.serialize()
+                const isRoot = currentKey.length === 0
+                if (!isRoot && encoded.length < 32) {
+                    continue
+                }
+
+                let dbKey = isRoot ? storageTrie.root() : (storageTrie as unknown as { hash: (msg: Uint8Array) => Uint8Array }).hash(encoded)
+                if (keyPrefix !== undefined) {
+                    dbKey = concatBytes(keyPrefix, dbKey)
+                }
+
+                const keyHex = bytesToHex(dbKey)
+                if (seen.has(keyHex)) {
+                    continue
+                }
+                seen.add(keyHex)
+                currentStorageTrieDb.push({
+                    key: keyHex,
+                    value: bytesToHex(encoded),
+                })
+            }
+
+            storageTrieDb.push(currentStorageTrieDb)
             stateRoots.push(bigIntToHex(merkleTrees.getRoot(address)));
         }
 
