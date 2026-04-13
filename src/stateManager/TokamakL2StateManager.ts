@@ -109,11 +109,17 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         for (const [idx, addressString] of snapshot.storageAddresses.entries()) {
             assertStorageEntryCapacity(snapshot.storageEntries[idx].length, addressString)
             const address = createAddressFromString(addressString);
+            const registeredL2KeyBigInts = new Set<bigint>();
             this._initializeAddressStorageMaps(address)
             for (const entry of snapshot.storageEntries[idx]) {
                 const vBytes = hexToBytes(addHexPrefix(entry.value));
                 const keyBytes = hexToBytes(addHexPrefix(entry.key));
+                const keyBigInt = bytesToBigInt(keyBytes);
+                if (registeredL2KeyBigInts.has(keyBigInt)) {
+                    throw new Error(`Duplication in L2 MPT keys.`);
+                }
                 await this.putStorage(address, keyBytes, vBytes);
+                registeredL2KeyBigInts.add(keyBigInt);
             }
         }
         await this.flush();
