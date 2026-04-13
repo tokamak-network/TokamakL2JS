@@ -80,9 +80,7 @@ const getRegisteredKeySetForContract = (
     throw new Error(`Snapshot does not contain storage state for ${contractAddress.toString()}.`);
   }
   return new Set(
-    snapshot.storageEntries[contractIndex].map((entry) =>
-      hexToBigInt(addHexPrefix(entry.key))
-    )
+    snapshot.storageKeys[contractIndex].map((entry) => hexToBigInt(addHexPrefix(entry)))
   );
 };
 

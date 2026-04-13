@@ -1,6 +1,6 @@
 {
   "name": "tokamak-l2js",
-  "version": "0.0.33",
+  "version": "0.1.0",
   "description": "TypeScript toolkit for Tokamak Network Layer-2 ZKP transactions, state management, and Poseidon/EDDSA cryptography.",
   "keywords": [
     "tokamak",
@@ -50,7 +50,6 @@
     "build": "npm run build:esm && npm run build:cjs",
     "build:esm": "tsc -p tsconfig.json",
     "build:cjs": "tsc -p tsconfig.cjs.json && node ./scripts/write-cjs-package.cjs",
-    "bench:init-from-snapshot": "node ./scripts/benchmark-init-from-snapshot.mjs",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run build"
   },

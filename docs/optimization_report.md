@@ -2,371 +2,273 @@
 
 ## Purpose
 
-This document records the optimization ideas, measurements, and conclusions discussed for
-`TokamakL2StateManager.initTokamakExtendsFromSnapshot()` and
-`TokamakL2StateManager.initTokamakExtendsFromRPC()`.
+This document records the optimization work performed for:
 
-It is a reference note only. These optimizations are not intended to be applied to
-remote `main` at this time.
+- `TokamakL2StateManager.initTokamakExtendsFromSnapshot()`
+- `TokamakL2StateManager.initTokamakExtendsFromRPC()`
 
-## Scope
+It summarizes which ideas were tested, which ones were rejected, which ones were
+adopted, and what the current performance characteristics look like.
 
-The discussion focused on initialization cost when reconstructing state from:
+## Current Status
 
-- `StateSnapshot`
-- L1 RPC storage reads
+The current codebase already includes the following accepted changes:
 
-The main code paths investigated were:
+1. Dense `IMT`-backed storage trees were replaced with `TokamakSparseMerkleTree`.
+2. `StateSnapshot` was redesigned to preload storage MPT state using:
+   - `storageKeys`
+   - `storageTrieRoots`
+   - `storageTrieDb`
+3. `initTokamakExtendsFromSnapshot()` no longer rebuilds the storage trie with
+   repeated `storageTrie.put()` calls.
+4. `TokamakSparseMerkleTree.batchUpdate()` was added and the init path now uses
+   batched Merkle updates instead of per-entry `update()` calls.
 
-- repeated calls to `putStorage()`
-- repeated `MerkleStateManager` storage trie writes
-- dense `IMT` construction using `Array(MAX_MT_LEAVES).fill(NULL_LEAF)`
+Legacy comparison benchmark scripts were removed after the batch-update result was
+confirmed, so this report preserves the important benchmark numbers.
 
-## Measurement Notes
+## Accepted Optimizations
 
-Unless stated otherwise, the benchmark target was:
+### 1. Sparse deterministic-index Merkle tree
 
-- `createTokamakL2StateManagerFromStateSnapshot()`
-- measured scope: `initTokamakExtendsFromSnapshot()` path only
-- synthetic shape: `1` storage address, `1` contract code entry, unique storage keys, non-zero values
-
-Important caveats:
-
-- Many early measurements used `repeats=1` and `warmup=0`.
-- Some early comparisons were run in parallel on the same machine and are noisy.
-- Sequential measurements are more trustworthy than parallel measurements, but they are still
-  not rigorous microbenchmarks because they also used `repeats=1`.
-
-Confidence levels in this report:
-
-- `Low`: noisy or parallel measurements
-- `Medium`: sequential measurements, but still single-run
-- `High`: not reached in this investigation
-
-## Current Baseline Observations
-
-### Initialization scaling
-
-Earlier broad snapshot measurements showed that initialization time increases steeply with both
-`MT_DEPTH` and the number of storage entries.
-
-Representative results from the previously used matrix:
-
-| MT_DEPTH | ratio | storageEntries | time |
-| --- | --- | ---: | ---: |
-| 12 | 10% | 409 | 4.129s |
-| 12 | 25% | 1024 | 10.446s |
-| 12 | 50% | 2048 | 21.472s |
-| 12 | 75% | 3072 | 32.863s |
-| 12 | 100% | 4096 | 44.794s |
-| 13 | 10% | 819 | 9.073s |
-| 13 | 25% | 2048 | 22.006s |
-| 13 | 50% | 4096 | 46.168s |
-| 13 | 75% | 6144 | 80.503s |
-| 13 | 100% | 8192 | 96.273s |
-| 14 | 10% | 1638 | 19.180s |
-| 14 | 25% | 4096 | 47.920s |
-| 14 | 50% | 8192 | unknown (>120s) |
-
-Interpretation:
-
-- `storageEntries` behaves close to linear for fixed depth.
-- `MT_DEPTH` is expensive because `MAX_MT_LEAVES = 2^MT_DEPTH`.
-- The current implementation pays both:
-  - dense tree construction cost
-  - per-slot storage trie write cost
-
-### Dense `IMT` constructor cost
-
-The dense constructor cost was measured separately for:
+The previous implementation paid a large depth-dependent cost because it built a
+dense `IMT` with:
 
 ```ts
-new IMT(..., Array(MAX_MT_LEAVES).fill(NULL_LEAF))
+Array(MAX_MT_LEAVES).fill(NULL_LEAF)
 ```
 
-Representative results:
+This was replaced with `TokamakSparseMerkleTree`, which:
 
-| MT_DEPTH | constructor time |
-| --- | ---: |
-| 12 | 0.615s |
-| 13 | 1.217s |
-| 14 | 2.457s |
-| 15 | 4.814s |
-| 16 | 9.642s |
-| 17 | 19.227s |
-| 18 | 39.346s |
+- preserves deterministic leaf indexing based on `key % MAX_MT_LEAVES`
+- stores only explicitly touched nodes
+- keeps root/proof behavior compatible with current `IMTMerkleProof` usage
 
-Interpretation:
+Effect:
 
-- Dense `IMT` construction is a real cost.
-- It is not the only cost.
-- Any optimization that removes this constructor cost alone is unlikely to be enough.
+- initialization time is no longer strongly coupled to `MT_DEPTH`
+- the dominant cost moved toward storage-entry count rather than tree capacity
 
-## Attempted Optimizations
+### 2. Preloaded storage trie snapshots
 
-### 1. Optional flush flag in `putStorage()`
+`StateSnapshot` used to carry `storageEntries[{ key, value }]`.
+That format forced `initTokamakExtendsFromSnapshot()` to execute repeated
+storage-trie writes during reconstruction.
+
+The current snapshot format stores:
+
+- `storageKeys`
+- `storageTrieRoots`
+- `storageTrieDb`
+
+This allows snapshot initialization to:
+
+1. preload trie nodes into the account trie DB
+2. assign the known storage root to the account
+3. read values back through the trie using `storageKeys`
+
+Effect:
+
+- the expensive repeated `storageTrie.put()` loop was removed from the snapshot path
+
+### 3. Batched sparse Merkle updates
+
+Even after preloading the storage trie, the snapshot init path still performed:
+
+- one `merkleTrees.update(...)` call per storage entry
+
+That meant recomputing ancestors repeatedly for overlapping paths.
+
+`TokamakSparseMerkleTree.batchUpdate()` now:
+
+- applies all changed leaves first
+- recomputes only the affected parent indices at each level
+- performs one upward pass per level for the changed frontier
+
+The snapshot and RPC init paths now use batched updates for per-address Merkle
+reconstruction.
+
+## Rejected or Ineffective Optimizations
+
+The following ideas were tested earlier and did not produce useful end-to-end
+improvement:
+
+### 1. Optional flush suppression in `putStorage()`
 
 Idea:
 
-- add `putStorage(address, key, value, flush = true)`
-- call `putStorage(..., false)` during init loops
-- call `flush()` once at the end
+- call `putStorage(..., false)` during init
+- `flush()` once at the end
 
-Why it seemed promising:
+Result:
 
-- the original init path called `putStorage()` in a loop
-- `putStorage()` itself called `await this.flush()`
+- no meaningful speedup in practice
 
-Observed result:
+Reason:
 
-- no clear benefit in the benchmark
-- practical effect appeared negligible
+- trie writes, not `flush()` call count, dominated runtime
 
-Confidence:
-
-- `Low`
-
-Reason for low confidence:
-
-- the direct before/after benchmark for this change was not measured under a strict setup
-- however, no evidence of meaningful improvement was found
-
-Current conclusion:
-
-- this optimization is not worth adopting based on current evidence
-
-### 2. `O(1)` collision tracking with reverse leaf-index map
+### 2. `O(1)` collision tracking with reverse leaf-index maps
 
 Idea:
 
 - maintain `leafIndex -> key` in addition to `key -> leafIndex`
-- replace full scans during collision checks with direct lookup
 
-Why it seemed promising:
+Result:
 
-- current collision detection in `putStorage()` scanned existing keys for the same address
+- useful for cleaner logic and worst-case behavior
+- not a meaningful end-to-end speed optimization
 
-Observed result:
-
-- practical effect on end-to-end init time was negligible
-
-Additional verification:
-
-- behavior was checked against the previous implementation
-- snapshot init result, RPC init result, and collision error behavior matched the baseline
-
-Confidence:
-
-- `Medium` for behavioral equivalence
-- `Low` for exact speedup estimate
-
-Current conclusion:
-
-- acceptable as a code-structure improvement
-- not meaningful as a performance optimization
-
-### 3. Init path bypass of public `putStorage()`
+### 3. Init-path bypass of the public `putStorage()` wrapper
 
 Idea:
 
-- keep public API unchanged
-- update internal maps and Merkle trees directly during init
-- call `super.putStorage()` directly instead of routing through the public wrapper
+- avoid wrapper overhead
+- update internal structures more directly during init
 
-Observed result:
+Result:
 
-- practical effect on end-to-end init time was negligible
-
-Interpretation:
-
-- wrapper overhead is small compared with the actual trie write cost
-
-Confidence:
-
-- `Low`
-
-Current conclusion:
-
-- not useful as a standalone optimization
-
-## Bulk Storage Trie Write Prototype
-
-### Idea
-
-Use `MerkleStateManager` protected internals to batch storage writes per address:
-
-- call `getAccount(address)` once
-- call `_modifyContractStorage(address, account, ...)` once
-- apply many storage trie `put()` operations to the same `storageTrie`
-- update `storageRoot` and `putAccount()` once per address instead of once per slot
-
-This does not rely on `dumpStorage()` or `dumpStorageRange()`.
-It relies on already having original storage keys and values.
-
-### Why this was investigated
-
-This is a lower-level optimization than the flush and wrapper changes.
-It reduces repeated account-level trie work.
-
-### Measured Result
-
-An isolated prototype was created in a temporary worktree.
-The prototype was benchmarked against current code.
-
-Early comparison result:
-
-| MT_DEPTH | ratio | baseline | bulk prototype | speedup |
-| --- | --- | ---: | ---: | ---: |
-| 12 | 25% | 8.274s | 6.965s | 1.19x |
-| 12 | 50% | 17.327s | 14.658s | 1.18x |
-| 12 | 100% | 36.004s | 30.778s | 1.17x |
-| 13 | 25% | 17.757s | 15.283s | 1.16x |
-| 13 | 50% | 37.266s | 31.795s | 1.17x |
-| 13 | 100% | 78.064s | 68.139s | 1.15x |
-
-Confidence:
-
-- `Low`
+- no meaningful improvement by itself
 
 Reason:
 
-- measured with single-run, non-rigorous comparison
+- wrapper overhead was not the bottleneck
 
-Current conclusion:
+## Bottleneck Analysis
 
-- likely provides a real but modest gain
-- not enough on its own to solve the problem
+Before the accepted optimizations were applied, the main snapshot-init bottlenecks
+were measured as:
 
-## Sparse Merkle Tree plus Bulk Storage Trie Write Prototype
+- repeated `storageTrie.put(...)` calls
+- repeated `merkleTrees.update(...)` calls
 
-### Combined idea
+Further inspection showed:
 
-Apply both:
+- `RLP.encode(...)` was not a bottleneck
+- the actual cost was the trie `put()` itself
 
-- replace dense `IMT` usage with a sparse deterministic-index Merkle tree implementation
-- use address-level bulk storage trie writes
+After moving to preloaded trie snapshots, the dominant remaining cost became the
+Tokamak storage Merkle reconstruction. That is what motivated `batchUpdate()`.
 
-The sparse tree preserved:
+## Snapshot Format Trade-Offs
 
-- deterministic leaf index based on `key % MAX_MT_LEAVES`
-- root retrieval
-- proof shape compatible with current `IMTMerkleProof` usage
+The preloaded-trie snapshot format improves runtime but makes snapshots larger.
 
-### Earlier comparison
+A previous measurement with JSON hex encoding showed that adding full storage MPT
+data can increase snapshot size by roughly one order of magnitude or more.
 
-An earlier comparison suggested improvement, but it was not trustworthy enough because
-baseline and prototype measurements had inconsistent baselines.
+A later compression idea was considered:
 
-That result should not be treated as reliable.
+- remove `storageTrieDb[*].key`
+- keep only encoded node values
+- recompute DB keys during init
 
-Confidence:
+This was rejected.
 
-- `Low`
+Reason:
 
-### Sequential comparison without parallel execution
+- rebuilding DB keys requires hashing every trie node again
+- with the current crypto stack, that reintroduced a large init-time cost
+- in a measured synthetic case with 4096 storage entries and 20516 trie nodes,
+  recomputing keys added about `24.65s`
 
-A second comparison was performed sequentially:
+Conclusion:
 
-1. benchmark current code alone
-2. benchmark sparse+bulk prototype alone
+- `storageTrieDb.key` should remain present in the snapshot format
 
-Conditions:
+## Key Benchmark Results
 
-- `MT_DEPTH=12,13`
-- ratio `25%, 50%, 100%`
-- `repeats=1`
-- `warmup=0`
+### 1. Snapshot init after sparse tree + preloaded trie + batch update
+
+The current implementation was measured sequentially with:
+
+- `warmup = 0`
+- `repeats = 1`
+- no parallel execution
+- synthetic shape: `1` storage address, `1` contract code entry, non-zero 32-byte values
 
 Results:
 
-| MT_DEPTH | ratio | current `61bb8cd` | sparse+bulk prototype | speedup |
-| --- | --- | ---: | ---: | ---: |
-| 12 | 25% | 9.940s | 7.620s | 1.30x |
-| 12 | 50% | 20.614s | 16.920s | 1.22x |
-| 12 | 100% | 43.563s | 37.101s | 1.17x |
-| 13 | 25% | 21.828s | 17.449s | 1.25x |
-| 13 | 50% | 45.109s | 37.775s | 1.19x |
-| 13 | 100% | 94.666s | 81.658s | 1.16x |
+| MT_DEPTH | MAX_MT_LEAVES | storageEntries | time (s) |
+| --- | ---: | ---: | ---: |
+| 24 | 16777216 | 512 | 0.297 |
+| 24 | 16777216 | 1024 | 0.521 |
+| 24 | 16777216 | 2048 | 1.046 |
+| 24 | 16777216 | 4096 | 2.039 |
+| 24 | 16777216 | 8192 | 4.042 |
+| 30 | 1073741824 | 512 | 0.258 |
+| 30 | 1073741824 | 1024 | 0.550 |
+| 30 | 1073741824 | 2048 | 0.809 |
+| 30 | 1073741824 | 4096 | 2.102 |
+| 30 | 1073741824 | 8192 | 4.025 |
+| 36 | 68719476736 | 512 | 0.168 |
+| 36 | 68719476736 | 1024 | 0.542 |
+| 36 | 68719476736 | 2048 | 1.033 |
+| 36 | 68719476736 | 4096 | 2.059 |
+| 36 | 68719476736 | 8192 | 4.092 |
+| 42 | 4398046511104 | 512 | 0.260 |
+| 42 | 4398046511104 | 1024 | 0.526 |
+| 42 | 4398046511104 | 2048 | 1.023 |
+| 42 | 4398046511104 | 4096 | 2.080 |
+| 42 | 4398046511104 | 8192 | 4.106 |
 
-Confidence:
+Interpretation:
 
-- `Medium`
+- runtime is now dominated primarily by `storageEntries`
+- `MT_DEPTH` has only a small effect in the tested range
+- the growth with respect to `storageEntries` is close to linear
 
-Reason:
+### 2. Effect of `batchUpdate()` alone
 
-- sequential comparison removed the parallel-execution flaw
-- still only single-run and no warmup
+The `batchUpdate()` change was measured directly against the immediately previous
+revision under:
 
-Current conclusion:
+- `MT_DEPTH = 30`
+- `storageEntries = 4096`
+- `warmup = 1`
+- `repeats = 3`
+- sequential execution only
 
-- this combined approach appears to produce a real improvement
-- the gain is meaningful but not dramatic
-- expected improvement appears to be roughly `1.16x` to `1.30x` in the tested range
+Results:
 
-## Export / Import Investigation
+| Revision | avg s | min s | max s |
+| --- | ---: | ---: | ---: |
+| pre-batch `838765c` | 29.052 | 28.946 | 29.170 |
+| post-batch `88d850d` | 2.156 | 2.118 | 2.194 |
 
-The following `MerkleStateManager` APIs were inspected:
+Interpretation:
 
-- `dumpStorage(address)`
-- `dumpStorageRange(address, startKey, limit)`
+- `batchUpdate()` reduced the measured runtime by about `13.47x`
+- the per-entry repeated Merkle ancestor recomputation had been a dominant bottleneck
 
-Key findings:
+## Current Practical Conclusion
 
-- they export hashed storage trie keys, not original storage slot keys
-- `dumpStorageRange()` does not provide usable key preimages in practice
-- there is no public round-trip import API for this export format
+At this point the initialization bottlenecks have shifted:
 
-Implication:
+- `MT_DEPTH` is no longer the main problem
+- per-entry storage scaling is much better than before, but still not free
+- current runtime is mostly shaped by the number of storage entries
 
-- these APIs are not suitable for efficiently reconstructing storage from exported data
-- they do not remove the need to already know original storage keys
+The largest accepted wins came from:
 
-## What Failed
+1. sparse deterministic-index Merkle trees
+2. preloaded storage-trie snapshots
+3. batched sparse Merkle reconstruction
 
-Based on the experiments so far, the following approaches did not show useful performance gains:
+## Remaining Future Work
 
-- optional flush suppression in `putStorage()`
-- `O(1)` collision map
-- bypassing public `putStorage()` during init while keeping the same underlying write pattern
+If initialization is revisited again, the remaining questions are no longer about
+depth scaling. The next meaningful targets would be:
 
-These are not necessarily wrong changes, but they do not address the dominant cost.
+1. snapshot size reduction without reintroducing hash-heavy reconstruction costs
+2. faster snapshot serialization/deserialization formats than JSON hex
+3. further reducing the per-entry cost of storage-key iteration and trie reads, if
+   that ever becomes material in larger real-world workloads
 
-## What Still Looks Plausible
+## Final Statement
 
-Based on current evidence, the only optimization direction that showed clear improvement was:
+This repository is no longer on the old unoptimized baseline for this line of
+investigation.
 
-- address-level bulk storage trie writes
-
-And the strongest combined result came from:
-
-- sparse deterministic-index Merkle tree
-- address-level bulk storage trie writes
-
-However:
-
-- the gain is moderate, not transformative
-- no optimization investigated so far justifies merging into remote `main`
-
-## Recommendation for Future Revisit
-
-If this topic is revisited later:
-
-1. Start from the sequential sparse+bulk result, not from the earlier noisy runs.
-2. Re-run the benchmark with a stricter method:
-   - no parallel execution
-   - `warmup >= 1`
-   - `repeats >= 5`
-   - compare medians, not only single timings
-3. Validate correctness for:
-   - snapshot root reconstruction
-   - RPC and snapshot equivalence
-   - collision behavior
-   - Merkle proof compatibility
-4. Only consider production adoption if the stricter benchmark confirms the gain and the
-   implementation complexity is acceptable.
-
-## Final Status
-
-No optimization from this investigation is currently applied to the checked-in code path.
-
-The repository remains on the unoptimized baseline for this line of investigation.
+The currently checked-in code already includes the main successful optimizations for
+`initTokamakExtendsFromSnapshot()`.
