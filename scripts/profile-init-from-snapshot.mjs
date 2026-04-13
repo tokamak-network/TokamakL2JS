@@ -391,6 +391,8 @@ async function main() {
       treeNodeToBigint: modules.treeNodeToBigint,
     });
 
+    await modules.createTokamakL2StateManagerFromStateSnapshot(snapshot, { contractCodes });
+
     const timings = new Map();
     const restoreProfiler = installProfiler({
       timings,
