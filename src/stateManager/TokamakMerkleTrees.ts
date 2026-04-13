@@ -156,37 +156,65 @@ export class TokamakSparseMerkleTree {
     }
 
     public update(index: number, newLeaf: IMTNode) {
-        assertNumber(index, "index")
-        assertNode(newLeaf, "newLeaf")
+        this.batchUpdate([{ index, leaf: newLeaf }])
+    }
 
-        if (!Number.isInteger(index) || index < 0 || index >= this._capacity) {
-            throw new Error("The leaf does not exist in this tree")
-        }
+    public batchUpdate(updates: { index: number, leaf: IMTNode }[]) {
+        assertArray(updates, "updates")
 
-        if (newLeaf === this._getNode(0, index)) {
+        if (updates.length === 0) {
             return
         }
 
-        let node = newLeaf
-        let currentIndex = index
+        const leafUpdates = new Map<number, IMTNode>()
 
-        for (let level = 0; level < this.depth; level += 1) {
-            const position = currentIndex % this.arity
-            const levelStartIndex = currentIndex - position
-            const levelEndIndex = levelStartIndex + this.arity
-            const children: IMTNode[] = []
+        for (const update of updates) {
+            assertObject(update, "update")
+            assertNumber(update.index, "update.index")
+            assertNode(update.leaf, "update.leaf")
 
-            this._setNode(level, currentIndex, node)
-
-            for (let childIndex = levelStartIndex; childIndex < levelEndIndex; childIndex += 1) {
-                children.push(this._getNode(level, childIndex))
+            if (!Number.isInteger(update.index) || update.index < 0 || update.index >= this._capacity) {
+                throw new Error("The leaf does not exist in this tree")
             }
 
-            node = this._hash(children)
-            currentIndex = Math.floor(currentIndex / this.arity)
+            leafUpdates.set(update.index, update.leaf)
         }
 
-        this._setNode(this.depth, 0, node)
+        let affectedIndexes = new Set<number>()
+
+        for (const [index, leaf] of leafUpdates.entries()) {
+            if (leaf === this._getNode(0, index)) {
+                continue
+            }
+
+            this._setNode(0, index, leaf)
+            affectedIndexes.add(index)
+        }
+
+        if (affectedIndexes.size === 0) {
+            return
+        }
+
+        for (let level = 0; level < this.depth; level += 1) {
+            const parentIndexes = new Set<number>()
+
+            for (const childIndex of affectedIndexes) {
+                parentIndexes.add(Math.floor(childIndex / this.arity))
+            }
+
+            for (const parentIndex of parentIndexes) {
+                const levelStartIndex = parentIndex * this.arity
+                const children: IMTNode[] = []
+
+                for (let offset = 0; offset < this.arity; offset += 1) {
+                    children.push(this._getNode(level, levelStartIndex + offset))
+                }
+
+                this._setNode(level + 1, parentIndex, this._hash(children))
+            }
+
+            affectedIndexes = parentIndexes
+        }
     }
 
     public createProof(index: number): IMTMerkleProof {
@@ -294,6 +322,21 @@ export class TokamakL2MerkleTrees {
         const leaf = value % jubjub.Point.Fp.ORDER;
         tree.update(leafIndex, leaf);
         return leaf
+    }
+
+    public batchUpdate(address: bigint, entries: { key: bigint, value: bigint }[]): bigint[] {
+        const tree = this._trees.get(address);
+        if (tree === undefined) {
+            throw new Error(`Merkle tree is not registered for the address ${address.toString()}`);
+        }
+
+        const updates = entries.map(({ key, value }) => ({
+            index: TokamakL2MerkleTrees.getLeafIndex(key),
+            leaf: value % jubjub.Point.Fp.ORDER,
+        }))
+
+        tree.batchUpdate(updates)
+        return updates.map((update) => treeNodeToBigint(update.leaf))
     }
 
     public static getLeafIndex(key: bigint): number {

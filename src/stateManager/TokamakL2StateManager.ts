@@ -139,9 +139,10 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             this._storageKeyLeafIndexes.set(addressBigInt, keyLeafIndexesForAddress)
             this._storageLeafIndexKeys.set(addressBigInt, leafIndexKeysForAddress)
 
-            for (const entry of normalizedEntries) {
-                merkleTrees.update(addressBigInt, entry.keyBigInt, entry.valueBigInt)
-            }
+            merkleTrees.batchUpdate(addressBigInt, normalizedEntries.map((entry) => ({
+                key: entry.keyBigInt,
+                value: entry.valueBigInt,
+            })))
         }
         await this.flush();
     }
@@ -219,9 +220,10 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             this._storageKeyLeafIndexes.set(addressBigInt, keyLeafIndexesForAddress)
             this._storageLeafIndexKeys.set(addressBigInt, leafIndexKeysForAddress)
 
-            for (const entry of normalizedEntries) {
-                merkleTrees.update(addressBigInt, entry.keyBigInt, entry.valueBigInt)
-            }
+            merkleTrees.batchUpdate(addressBigInt, normalizedEntries.map((entry) => ({
+                key: entry.keyBigInt,
+                value: entry.valueBigInt,
+            })))
         }
         await this.flush();
         const roots = this._getMerkleTrees().getRoots(storageAddresses);
