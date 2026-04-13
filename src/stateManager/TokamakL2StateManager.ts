@@ -328,7 +328,16 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
                 continue
             }
 
-            const keyPrefix = (storageTrie as unknown as { _opts: { keyPrefix?: Uint8Array } })._opts.keyPrefix
+            let keyPrefix: Uint8Array | undefined
+            // Copy the keyPrefix derivation used by MerkleStateManager when it creates storage tries.
+            if (this._prefixStorageTrieKeys) {
+                const keccak256 = this.common.customCrypto.keccak256
+                if (keccak256 === undefined) {
+                    throw new Error('customCrypto.keccak256 must be defined when storage trie key prefixing is enabled')
+                }
+                const addressBytes = keccak256(address.bytes)
+                keyPrefix = addressBytes.slice(0, 7)
+            }
             const currentStorageTrieDb: StorageTrieDbEntryJson[] = []
             const seen = new Set<string>()
 
