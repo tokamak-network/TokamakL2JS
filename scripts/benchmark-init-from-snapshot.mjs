@@ -19,10 +19,11 @@ import { poseidon2 } from 'poseidon-bls12381';
 const execFileAsync = promisify(execFile);
 const POSEIDON_INPUTS = 2;
 const NULL_LEAF = 0n;
-const DEFAULT_DEPTHS = [8, 10, 12, 14];
-const DEFAULT_ENTRY_COUNTS = [1, 32, 256, 1024, 2048, 4096];
-const DEFAULT_REPEATS = 5;
-const DEFAULT_WARMUP = 1;
+const DEFAULT_DEPTHS = [12, 13, 14, 15, 16, 17, 18];
+const DEFAULT_ENTRY_RATIOS = [10, 25, 50, 75, 100];
+const DEFAULT_REPEATS = 1;
+const DEFAULT_WARMUP = 0;
+const DEFAULT_TIMEOUT_SECONDS = 120;
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(scriptPath), '..');
@@ -60,6 +61,21 @@ function parseIntegerList(rawValue, fallback) {
   return values;
 }
 
+function parseRatioList(rawValue, fallback) {
+  if (!rawValue) {
+    return fallback;
+  }
+  const values = rawValue
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0)
+    .map((entry) => Number.parseFloat(entry));
+  if (values.length === 0 || values.some((value) => !Number.isFinite(value) || value <= 0 || value > 100)) {
+    throw new Error(`Expected a comma-separated list of ratios in the range (0, 100], but got "${rawValue}"`);
+  }
+  return values;
+}
+
 function parseInteger(rawValue, fallback, label) {
   if (!rawValue) {
     return fallback;
@@ -71,7 +87,7 @@ function parseInteger(rawValue, fallback, label) {
   return value;
 }
 
-function formatMs(value) {
+function formatSeconds(value) {
   return value.toFixed(3);
 }
 
@@ -79,21 +95,21 @@ function getSummary(values) {
   const sorted = [...values].sort((a, b) => a - b);
   const total = sorted.reduce((sum, value) => sum + value, 0);
   return {
-    avgMs: total / sorted.length,
-    minMs: sorted[0],
-    maxMs: sorted[sorted.length - 1],
+    avgSeconds: total / sorted.length,
+    minSeconds: sorted[0],
+    maxSeconds: sorted[sorted.length - 1],
   };
 }
 
 function renderTable(rows) {
   const lines = [
-    '| MT_DEPTH | MAX_MT_LEAVES | storageEntries | repeats | avg ms | min ms | max ms | note |',
-    '| --- | --- | --- | --- | --- | --- | --- | --- |',
+    '| MT_DEPTH | MAX_MT_LEAVES | ratio | storageEntries | repeats | avg s | min s | max s | note |',
+    '| --- | --- | --- | --- | --- | --- | --- | --- | --- |',
   ];
 
   for (const row of rows) {
     lines.push(
-      `| ${row.depth} | ${row.maxLeaves} | ${row.entryCount} | ${row.repeats} | ${row.avgMs ?? '-'} | ${row.minMs ?? '-'} | ${row.maxMs ?? '-'} | ${row.note} |`
+      `| ${row.depth} | ${row.maxLeaves} | ${row.ratioLabel} | ${row.entryCount} | ${row.repeats} | ${row.avgSeconds ?? 'unknown'} | ${row.minSeconds ?? 'unknown'} | ${row.maxSeconds ?? 'unknown'} | ${row.note} |`
     );
   }
 
@@ -203,8 +219,8 @@ async function runWorker(options) {
   for (let round = 0; round < repeats; round += 1) {
     const startedAt = hrtime.bigint();
     await createTokamakL2StateManagerFromStateSnapshot(snapshot, { contractCodes });
-    const elapsedMs = Number(hrtime.bigint() - startedAt) / 1_000_000;
-    timingsMs.push(elapsedMs);
+    const elapsedSeconds = Number(hrtime.bigint() - startedAt) / 1_000_000_000;
+    timingsMs.push(elapsedSeconds);
   }
 
   process.stdout.write(
@@ -213,16 +229,20 @@ async function runWorker(options) {
       entryCount,
       repeats,
       warmup,
-      timingsMs,
+      timingsSeconds: timingsMs,
     })}\n`
   );
 }
 
 async function runMain(options) {
   const depths = parseIntegerList(options.get('depths'), DEFAULT_DEPTHS);
-  const entryCounts = parseIntegerList(options.get('entryCounts'), DEFAULT_ENTRY_COUNTS);
+  const ratios = parseRatioList(options.get('ratios'), DEFAULT_ENTRY_RATIOS);
+  const entryCounts = options.has('entryCounts')
+    ? parseIntegerList(options.get('entryCounts'), [])
+    : null;
   const repeats = parseInteger(options.get('repeats'), DEFAULT_REPEATS, 'repeats');
   const warmup = parseInteger(options.get('warmup'), DEFAULT_WARMUP, 'warmup');
+  const timeoutSeconds = parseInteger(options.get('timeoutSeconds'), DEFAULT_TIMEOUT_SECONDS, 'timeoutSeconds');
 
   const originalParamsSource = await fs.readFile(paramsFile, 'utf8');
   const originalDepthMatch = originalParamsSource.match(/export const MT_DEPTH = (\d+);/);
@@ -240,11 +260,14 @@ async function runMain(options) {
       await runCommand('npm', ['run', 'build']);
 
       const maxLeaves = POSEIDON_INPUTS ** depth;
-      for (const entryCount of entryCounts) {
+      const countsForDepth = entryCounts ?? ratios.map((ratio) => Math.floor((maxLeaves * ratio) / 100));
+      for (const [idx, entryCount] of countsForDepth.entries()) {
+        const ratioLabel = entryCounts ? '-' : `${ratios[idx]}%`;
         if (entryCount > maxLeaves) {
           rows.push({
             depth,
             maxLeaves,
+            ratioLabel,
             entryCount,
             repeats,
             note: 'skipped: entryCount exceeds MAX_MT_LEAVES',
@@ -252,26 +275,46 @@ async function runMain(options) {
           continue;
         }
 
-        const { stdout } = await runCommand(process.execPath, [
-          scriptPath,
-          '--worker',
-          `--depth=${depth}`,
-          `--entries=${entryCount}`,
-          `--repeats=${repeats}`,
-          `--warmup=${warmup}`,
-        ]);
-        const measurement = JSON.parse(stdout.trim());
-        const summary = getSummary(measurement.timingsMs);
-        rows.push({
-          depth,
-          maxLeaves,
-          entryCount,
-          repeats,
-          avgMs: formatMs(summary.avgMs),
-          minMs: formatMs(summary.minMs),
-          maxMs: formatMs(summary.maxMs),
-          note: `warmup ${warmup}`,
-        });
+        try {
+          const { stdout } = await runCommand(
+            process.execPath,
+            [
+              scriptPath,
+              '--worker',
+              `--depth=${depth}`,
+              `--entries=${entryCount}`,
+              `--repeats=${repeats}`,
+              `--warmup=${warmup}`,
+            ],
+            { timeout: timeoutSeconds * 1000 }
+          );
+          const measurement = JSON.parse(stdout.trim());
+          const summary = getSummary(measurement.timingsSeconds);
+          rows.push({
+            depth,
+            maxLeaves,
+            ratioLabel,
+            entryCount,
+            repeats,
+            avgSeconds: formatSeconds(summary.avgSeconds),
+            minSeconds: formatSeconds(summary.minSeconds),
+            maxSeconds: formatSeconds(summary.maxSeconds),
+            note: `warmup ${warmup}`,
+          });
+        } catch (error) {
+          if (error?.killed || error?.signal === 'SIGTERM') {
+            rows.push({
+              depth,
+              maxLeaves,
+              ratioLabel,
+              entryCount,
+              repeats,
+              note: `unknown: exceeded ${timeoutSeconds}s`,
+            });
+            continue;
+          }
+          throw error;
+        }
       }
     }
   } finally {
@@ -286,10 +329,11 @@ async function runMain(options) {
       'Benchmark target: createTokamakL2StateManagerFromStateSnapshot',
       'Measured scope: initTokamakExtendsFromSnapshot path only; build time excluded.',
       'Synthetic snapshot shape: 1 storage address, 1 contract code entry, unique storage keys, non-zero 32-byte values.',
+      'storageEntries is computed as floor(MAX_MT_LEAVES * ratio / 100) when --ratios is used.',
       '',
       renderTable(rows),
       '',
-      JSON.stringify({ depths, entryCounts, repeats, warmup, rows }, null, 2),
+      JSON.stringify({ depths, ratios, entryCounts, repeats, warmup, timeoutSeconds, rows }, null, 2),
       '',
     ].join('\n')
   );
