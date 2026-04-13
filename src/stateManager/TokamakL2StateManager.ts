@@ -32,21 +32,15 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         return this._merkleTrees
     }
 
-    private _assertNotInitialized(): void {
+    private async _initializeForAddresses(addresses: Address[]): Promise<void> {
         if (this._storageEntries !== null || this._storageAddresses !== null || this._merkleTrees !== null || this._storageKeyLeafIndexes !== null) {
             throw new Error('TokamakL2StateManager cannot be initialized twice')
         }
-    }
-
-    private _initializeStorageContext(addresses: Address[]): void {
         this._storageAddresses = addresses
         this._merkleTrees = new TokamakL2MerkleTrees(addresses)
         this._storageEntries = new Map()
         this._storageKeyLeafIndexes = new Map()
-    }
-
-    private async _openTrackedAccounts(): Promise<void> {
-        await Promise.all(this._getStorageAddresses().map(addr => this._openAccount(addr)))
+        await Promise.all(addresses.map(addr => this._openAccount(addr)))
     }
 
     private _initializeAddressStorageMaps(address: Address): void {
@@ -70,12 +64,10 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
     }
 
     public async initTokamakExtendsFromRPC(rpcUrl: string, opts: TokamakL2StateManagerRPCOpts): Promise<void> {
-        this._assertNotInitialized()
         for (const storageConfig of opts.storageConfig) {
             assertStorageEntryCapacity(storageConfig.keyPairs.length, storageConfig.address.toString())
         }
-        this._initializeStorageContext(opts.storageConfig.map((entry) => entry.address))
-        await this._openTrackedAccounts()
+        await this._initializeForAddresses(opts.storageConfig.map((entry) => entry.address))
         const provider = new ethers.JsonRpcProvider(rpcUrl)
         for (const addr of opts.callCodeAddresses) {
             const byteCodeStr = await provider.getCode(addr.toString(), opts.blockNumber)
@@ -106,12 +98,10 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
     }
 
     public async initTokamakExtendsFromSnapshot(snapshot: StateSnapshot, opts: TokamakL2StateManagerSnapshotOpts): Promise<void> {
-        this._assertNotInitialized()
         assertSnapshotStorageShape(snapshot)
         this._channelId = snapshot.channelId;
         const storageAddresses = snapshot.storageAddresses.map(addrStr => createAddressFromString(addrStr))
-        this._initializeStorageContext(storageAddresses)
-        await this._openTrackedAccounts()
+        await this._initializeForAddresses(storageAddresses)
         for (const codeInfo of opts.contractCodes) {
             await this.putCode(codeInfo.address, hexToBytes(codeInfo.code));
         }
