@@ -20,7 +20,13 @@ export const assertStorageEntryCapacity = (entryCount: number, address: string):
 }
 
 export const assertSnapshotStorageShape = (snapshot: StateSnapshot): void => {
-    if (snapshot.stateRoots.length !== snapshot.storageAddresses.length || snapshot.storageAddresses.length !== snapshot.storageEntries.length) {
-        throw new Error('Snapshot is expected to have a set of storage entries for each state root')
+    const addressCount = snapshot.storageAddresses.length
+    if (
+        snapshot.stateRoots.length !== addressCount ||
+        snapshot.storageKeys.length !== addressCount ||
+        snapshot.storageTrieRoot.length !== addressCount ||
+        snapshot.storageTrieDb.length !== addressCount
+    ) {
+        throw new Error('Snapshot is expected to have storage keys, trie roots, and trie nodes for each state root')
     }
 }

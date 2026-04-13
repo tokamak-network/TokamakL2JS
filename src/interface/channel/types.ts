@@ -1,11 +1,20 @@
 export type StateSnapshot = {
   stateRoots: string[];
   storageAddresses: string[];
-  storageEntries: StorageEntriesJson;
+  storageKeys: StorageKeysJson;
+  storageTrieRoot: string[];
+  storageTrieDb: StorageTrieDbJson;
   channelId: number;
 }
 
-export type StorageEntriesJson = { key: string; value: string }[][]
+export type StorageKeysJson = string[][]
+
+export type StorageTrieDbEntryJson = {
+  key: string;
+  value: string;
+}
+
+export type StorageTrieDbJson = StorageTrieDbEntryJson[][]
 
 export type TxSnapshot = {
   nonce: number;

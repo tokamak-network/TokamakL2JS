@@ -11,10 +11,11 @@ import {
   bytesToHex,
   createAddressFromString,
   setLengthLeft,
+  unpadBytes,
 } from '@ethereumjs/util';
 import { jubjub } from '@noble/curves/misc';
-import { IMT } from '@zk-kit/imt';
-import { poseidon2 } from 'poseidon-bls12381';
+import { RLP } from '@ethereumjs/rlp';
+import { MerklePatriciaTrie } from '@ethereumjs/mpt';
 
 const execFileAsync = promisify(execFile);
 const POSEIDON_INPUTS = 2;
@@ -29,6 +30,10 @@ const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(scriptPath), '..');
 const paramsFile = path.join(repoRoot, 'src/interface/params/stateManager.ts');
 const distEntry = path.join(repoRoot, 'dist/index.js');
+const distCommonEntry = path.join(repoRoot, 'dist/common/index.js');
+const distMerkleEntry = path.join(repoRoot, 'dist/stateManager/TokamakMerkleTrees.js');
+const distCryptoEntry = path.join(repoRoot, 'dist/crypto/index.js');
+const distUtilsEntry = path.join(repoRoot, 'dist/stateManager/utils.js');
 
 function parseArgs(argv) {
   const options = new Map();
@@ -132,42 +137,38 @@ function updateDepthInSource(source, depth) {
   return source.replace(pattern, `export const MT_DEPTH = ${depth};`);
 }
 
-function poseidonRaw(inputs) {
-  if (inputs.length !== POSEIDON_INPUTS) {
-    throw new Error(`Expected ${POSEIDON_INPUTS} Poseidon inputs, but got ${inputs.length}`);
-  }
-  return poseidon2(inputs);
-}
-
-function treeNodeToBigint(node) {
-  if (typeof node === 'bigint') {
-    return node;
-  }
-  if (typeof node === 'string') {
-    return BigInt(node.startsWith('0x') ? node : `0x${node}`);
-  }
-  return BigInt(node);
-}
-
 function encodeWord(value) {
   return bytesToHex(setLengthLeft(bigIntToBytes(value), 32));
 }
 
-function buildSnapshot(depth, entryCount) {
+async function buildSnapshot(depth, entryCount) {
   const maxLeaves = POSEIDON_INPUTS ** depth;
   if (entryCount > maxLeaves) {
     throw new Error(`entryCount ${entryCount} exceeds MAX_MT_LEAVES ${maxLeaves} for MT_DEPTH ${depth}`);
   }
 
+  const nonce = `${Date.now()}-${Math.random()}`;
+  const [
+    { createTokamakL2Common },
+    { TokamakSparseMerkleTree },
+    { poseidon_raw },
+    { treeNodeToBigint },
+  ] = await Promise.all([
+    import(`${pathToFileURL(distCommonEntry).href}?worker=${nonce}`),
+    import(`${pathToFileURL(distMerkleEntry).href}?worker=${nonce}`),
+    import(`${pathToFileURL(distCryptoEntry).href}?worker=${nonce}`),
+    import(`${pathToFileURL(distUtilsEntry).href}?worker=${nonce}`),
+  ]);
+
   const storageAddress = '0x1000000000000000000000000000000000000001';
-  const tree = new IMT(
-    poseidonRaw,
+  const tree = new TokamakSparseMerkleTree(
+    poseidon_raw,
     depth,
     NULL_LEAF,
-    POSEIDON_INPUTS,
-    Array(maxLeaves).fill(NULL_LEAF)
+    POSEIDON_INPUTS
   );
-  const storageEntries = [];
+  const storageKeys = [];
+  const storageTrie = new MerklePatriciaTrie({ useKeyHashing: true, common: createTokamakL2Common() });
 
   for (let index = 0; index < entryCount; index += 1) {
     const key = BigInt(index);
@@ -175,10 +176,10 @@ function buildSnapshot(depth, entryCount) {
     const leafIndex = Number(key % BigInt(maxLeaves));
     const leaf = value % jubjub.Point.Fp.ORDER;
     tree.update(leafIndex, leaf);
-    storageEntries.push({
-      key: encodeWord(key),
-      value: encodeWord(value),
-    });
+    const keyBytes = setLengthLeft(bigIntToBytes(key), 32);
+    const valueBytes = setLengthLeft(bigIntToBytes(value), 32);
+    await storageTrie.put(keyBytes, RLP.encode(unpadBytes(valueBytes)));
+    storageKeys.push(encodeWord(key));
   }
 
   return {
@@ -186,7 +187,14 @@ function buildSnapshot(depth, entryCount) {
       channelId: 1,
       stateRoots: [bigIntToHex(treeNodeToBigint(tree.root))],
       storageAddresses: [storageAddress],
-      storageEntries: [storageEntries],
+      storageKeys: [storageKeys],
+      storageTrieRoot: [bytesToHex(storageTrie.root())],
+      storageTrieDb: [
+        Array.from(storageTrie.database().db._database.entries()).map(([key, value]) => ({
+          key: `0x${key}`,
+          value: bytesToHex(value),
+        })),
+      ],
     },
     contractCodes: [
       {
@@ -209,7 +217,7 @@ async function runWorker(options) {
 
   const moduleUrl = `${pathToFileURL(distEntry).href}?worker=${Date.now()}-${Math.random()}`;
   const { createTokamakL2StateManagerFromStateSnapshot } = await import(moduleUrl);
-  const { snapshot, contractCodes } = buildSnapshot(depth, entryCount);
+  const { snapshot, contractCodes } = await buildSnapshot(depth, entryCount);
 
   for (let round = 0; round < warmup; round += 1) {
     await createTokamakL2StateManagerFromStateSnapshot(snapshot, { contractCodes });

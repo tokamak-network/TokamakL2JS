@@ -138,12 +138,12 @@ async function warmUpCurrentPath(snapshotLike, createTokamakL2StateManagerFromSt
     channelId: 1,
     stateRoots: ['0x' + '00'.repeat(32)],
     storageAddresses: [snapshotLike.storageAddress],
-    storageEntries: [
-      snapshotLike.storageKeys.map((keyHex, index) => ({
-        key: keyHex,
-        value: encodeWord(BigInt(index + 1)),
-      })),
-    ],
+    storageKeys: [snapshotLike.storageKeys],
+    storageTrieRoot: [snapshotLike.storageTrieRoot],
+    storageTrieDb: [snapshotLike.storageTrieDb.map((entry) => ({
+      key: `0x${entry.key}`,
+      value: entry.value,
+    }))],
   };
 
   try {

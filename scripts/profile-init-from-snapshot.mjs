@@ -17,6 +17,7 @@ import {
   unpadBytes,
 } from '@ethereumjs/util';
 import { RLP } from '@ethereumjs/rlp';
+import { MerklePatriciaTrie } from '@ethereumjs/mpt';
 import { jubjub } from '@noble/curves/misc';
 
 const execFileAsync = promisify(execFile);
@@ -96,6 +97,7 @@ async function importProfileModules() {
     stateManagerParamsModule,
     cryptoParamsModule,
     utilsModule,
+    commonModule,
   ] = await Promise.all([
     import(`${baseUrl}stateManager/TokamakL2StateManager.js`),
     import(`${baseUrl}stateManager/TokamakMerkleTrees.js`),
@@ -103,6 +105,7 @@ async function importProfileModules() {
     import(`${baseUrl}interface/params/stateManager.js`),
     import(`${baseUrl}interface/params/crypto.js`),
     import(`${baseUrl}stateManager/utils.js`),
+    import(`${baseUrl}common/index.js`),
   ]);
 
   const topLevelModule = await import(`${baseUrl}index.js`);
@@ -118,13 +121,15 @@ async function importProfileModules() {
     treeNodeToBigint: utilsModule.treeNodeToBigint,
     assertSnapshotStorageShape: utilsModule.assertSnapshotStorageShape,
     assertStorageEntryCapacity: utilsModule.assertStorageEntryCapacity,
+    createTokamakL2Common: commonModule.createTokamakL2Common,
   };
 }
 
-function buildSnapshot({ depth, entryCount, TokamakSparseMerkleTree, poseidon_raw, NULL_LEAF, POSEIDON_INPUTS, treeNodeToBigint }) {
+async function buildSnapshot({ depth, entryCount, TokamakSparseMerkleTree, poseidon_raw, NULL_LEAF, POSEIDON_INPUTS, treeNodeToBigint, createTokamakL2Common }) {
   const storageAddress = '0x1000000000000000000000000000000000000001';
   const tree = new TokamakSparseMerkleTree(poseidon_raw, depth, NULL_LEAF, POSEIDON_INPUTS);
-  const storageEntries = [];
+  const storageKeys = [];
+  const storageTrie = new MerklePatriciaTrie({ useKeyHashing: true, common: createTokamakL2Common() });
 
   for (let index = 0; index < entryCount; index += 1) {
     const key = BigInt(index);
@@ -132,10 +137,10 @@ function buildSnapshot({ depth, entryCount, TokamakSparseMerkleTree, poseidon_ra
     const leafIndex = Number(key % BigInt(POSEIDON_INPUTS ** depth));
     const leaf = value % jubjub.Point.Fp.ORDER;
     tree.update(leafIndex, leaf);
-    storageEntries.push({
-      key: encodeWord(key),
-      value: encodeWord(value),
-    });
+    const keyBytes = setLengthLeft(bigIntToBytes(key), 32);
+    const valueBytes = setLengthLeft(bigIntToBytes(value), 32);
+    await storageTrie.put(keyBytes, RLP.encode(unpadBytes(valueBytes)));
+    storageKeys.push(encodeWord(key));
   }
 
   return {
@@ -143,7 +148,14 @@ function buildSnapshot({ depth, entryCount, TokamakSparseMerkleTree, poseidon_ra
       channelId: 1,
       stateRoots: [bigIntToHex(treeNodeToBigint(tree.root))],
       storageAddresses: [storageAddress],
-      storageEntries: [storageEntries],
+      storageKeys: [storageKeys],
+      storageTrieRoot: [bytesToHex(storageTrie.root())],
+      storageTrieDb: [
+        Array.from(storageTrie.database().db._database.entries()).map(([key, value]) => ({
+          key: `0x${key}`,
+          value: bytesToHex(value),
+        })),
+      ],
     },
     contractCodes: [
       {
@@ -159,7 +171,7 @@ function installProfiler({ timings, TokamakL2StateManager, TokamakL2MerkleTrees,
   const originals = {
     initTokamakExtendsFromSnapshot: prototype.initTokamakExtendsFromSnapshot,
     _initializeForAddresses: prototype._initializeForAddresses,
-    _ingestStorageEntries: prototype._ingestStorageEntries,
+    _ingestSnapshotStorageTrie: prototype._ingestSnapshotStorageTrie,
     _openAccount: prototype._openAccount,
     putCode: prototype.putCode,
     flush: prototype.flush,
@@ -205,7 +217,7 @@ function installProfiler({ timings, TokamakL2StateManager, TokamakL2MerkleTrees,
     });
   };
 
-  prototype._ingestStorageEntries = async function patchedIngestStorageEntries(address, entries) {
+  prototype._ingestSnapshotStorageTrie = async function patchedIngestStorageTrie(address, storageKeys, storageTrieRoot, storageTrieDb) {
     return measureAsync(timings, 'ingest.total', async () => {
       measureSync(timings, 'ingest.guardChecks', () => {
         if (this._storageEntries === null) {
@@ -231,9 +243,26 @@ function installProfiler({ timings, TokamakL2StateManager, TokamakL2MerkleTrees,
       const leafIndexKeysForAddress = new Map();
       const normalizedEntries = [];
 
-      measureSync(timings, 'ingest.normalizeValidate', () => {
-        for (const entry of entries) {
-          const keyBigInt = bytesToBigInt(entry.key);
+      await measureAsync(timings, 'ingest.preloadTrieDb', async () => {
+        const trieDbOps = storageTrieDb.map((entry) => ({
+          type: 'put',
+          key: hexToBytes(addHexPrefix(entry.key)),
+          value: hexToBytes(addHexPrefix(entry.value)),
+        }));
+        await this._getAccountTrie().database().db.batch(trieDbOps);
+      });
+
+      await measureAsync(timings, 'ingest.applyStorageRootToAccount', async () => {
+        account.storageRoot = hexToBytes(addHexPrefix(storageTrieRoot));
+        await this.putAccount(address, account);
+      });
+
+      const storageTrie = measureSync(timings, 'ingest.getStorageTrie', () => this._getStorageTrie(address, account));
+
+      await measureAsync(timings, 'ingest.readValuesFromTrie', async () => {
+        for (const keyHex of storageKeys) {
+          const key = hexToBytes(addHexPrefix(keyHex));
+          const keyBigInt = bytesToBigInt(key);
           if (keyLeafIndexesForAddress.has(keyBigInt)) {
             throw new Error('Duplication in L2 MPT keys.');
           }
@@ -243,11 +272,11 @@ function installProfiler({ timings, TokamakL2StateManager, TokamakL2MerkleTrees,
             throw new Error(`Leaf index collision for address ${address.toString()}: storage key ${keyBigInt.toString()} conflicts with storage key ${conflictingKey.toString()} at leaf index ${leafIndex}`);
           }
 
-          const normalizedValue = unpadBytes(entry.value);
+          const encodedValue = await storageTrie.get(key);
+          const decodedValue = encodedValue === null ? new Uint8Array() : RLP.decode(encodedValue);
+          const normalizedValue = unpadBytes(decodedValue);
           const valueBigInt = normalizedValue.length === 0 ? 0n : bytesToBigInt(normalizedValue);
           normalizedEntries.push({
-            key: entry.key,
-            value: normalizedValue,
             keyBigInt,
             valueBigInt,
           });
@@ -255,25 +284,6 @@ function installProfiler({ timings, TokamakL2StateManager, TokamakL2MerkleTrees,
           keyLeafIndexesForAddress.set(keyBigInt, leafIndex);
           leafIndexKeysForAddress.set(leafIndex, keyBigInt);
         }
-      });
-
-      await measureAsync(timings, 'ingest.modifyContractStorage', async () => {
-        await this._modifyContractStorage(address, account, async (storageTrie, done) => {
-          await measureAsync(timings, 'ingest.storageTrieWrites', async () => {
-            for (const entry of normalizedEntries) {
-              if (entry.value.length === 0) {
-                await measureAsync(timings, 'ingest.storageTrieDelete', () => storageTrie.del(entry.key));
-              } else {
-                const encodedValue = measureSync(timings, 'ingest.storageTrieRlpEncode', () => RLP.encode(entry.value));
-                await measureAsync(timings, 'ingest.storageTriePut', () => storageTrie.put(entry.key, encodedValue));
-              }
-            }
-          });
-
-          measureSync(timings, 'ingest.modifyContractStorage.done', () => {
-            done();
-          });
-        });
       });
 
       measureSync(timings, 'ingest.commitMetadataMaps', () => {
@@ -315,17 +325,16 @@ function installProfiler({ timings, TokamakL2StateManager, TokamakL2MerkleTrees,
       await measureAsync(timings, 'snapshot.storageLoop', async () => {
         for (const [index, addressString] of snapshot.storageAddresses.entries()) {
           measureSync(timings, 'snapshot.assertStorageCapacity', () => {
-            assertStorageEntryCapacity(snapshot.storageEntries[index].length, addressString);
+            assertStorageEntryCapacity(snapshot.storageKeys[index].length, addressString);
           });
 
           const address = measureSync(timings, 'snapshot.decodeStorageAddress', () => createAddressFromString(addressString));
-          const decodedEntries = measureSync(timings, 'snapshot.decodeStorageEntries', () =>
-            snapshot.storageEntries[index].map((entry) => ({
-              key: hexToBytes(addHexPrefix(entry.key)),
-              value: hexToBytes(addHexPrefix(entry.value)),
-            }))
+          await this._ingestSnapshotStorageTrie(
+            address,
+            snapshot.storageKeys[index],
+            snapshot.storageTrieRoot[index],
+            snapshot.storageTrieDb[index]
           );
-          await this._ingestStorageEntries(address, decodedEntries);
         }
       });
 
@@ -349,7 +358,7 @@ function installProfiler({ timings, TokamakL2StateManager, TokamakL2MerkleTrees,
   return () => {
     prototype.initTokamakExtendsFromSnapshot = originals.initTokamakExtendsFromSnapshot;
     prototype._initializeForAddresses = originals._initializeForAddresses;
-    prototype._ingestStorageEntries = originals._ingestStorageEntries;
+    prototype._ingestSnapshotStorageTrie = originals._ingestSnapshotStorageTrie;
     prototype._openAccount = originals._openAccount;
     prototype.putCode = originals.putCode;
     prototype.flush = originals.flush;
@@ -382,7 +391,7 @@ async function main() {
     }
 
     const modules = await importProfileModules();
-    const { snapshot, contractCodes } = buildSnapshot({
+    const { snapshot, contractCodes } = await buildSnapshot({
       depth,
       entryCount,
       TokamakSparseMerkleTree: modules.TokamakSparseMerkleTree,
@@ -390,6 +399,7 @@ async function main() {
       NULL_LEAF: modules.NULL_LEAF,
       POSEIDON_INPUTS: modules.POSEIDON_INPUTS,
       treeNodeToBigint: modules.treeNodeToBigint,
+      createTokamakL2Common: modules.createTokamakL2Common,
     });
 
     await modules.createTokamakL2StateManagerFromStateSnapshot(snapshot, { contractCodes });
