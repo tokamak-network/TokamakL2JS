@@ -45,72 +45,6 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         await Promise.all(addresses.map(addr => this._openAccount(addr)))
     }
 
-    private async _ingestStorageEntries(address: Address, entries: { key: Uint8Array, value: Uint8Array }[]): Promise<void> {
-        if (this._storageEntries === null) {
-            throw new Error('Storage entries are not initialized')
-        }
-        if (this._storageKeyLeafIndexes === null) {
-            throw new Error('Storage key leaf indexes are not initialized')
-        }
-        if (this._storageLeafIndexKeys === null) {
-            throw new Error('Storage leaf index keys are not initialized')
-        }
-        const merkleTrees = this._getMerkleTrees()
-        const account = await this.getAccount(address)
-        if (account === undefined) {
-            throw new Error(`Cannot initialize storage for missing account ${address.toString()}`)
-        }
-
-        const addressBigInt = bytesToBigInt(address.bytes)
-        const storageEntriesForAddress = new Map<bigint, bigint>()
-        const keyLeafIndexesForAddress = new Map<bigint, number>()
-        const leafIndexKeysForAddress = new Map<number, bigint>()
-        const normalizedEntries: { key: Uint8Array, value: Uint8Array, keyBigInt: bigint, valueBigInt: bigint }[] = []
-
-        for (const entry of entries) {
-            const keyBigInt = bytesToBigInt(entry.key);
-            if (keyLeafIndexesForAddress.has(keyBigInt)) {
-                throw new Error(`Duplication in L2 MPT keys.`);
-            }
-            const leafIndex = TokamakL2MerkleTrees.getLeafIndex(keyBigInt)
-            const conflictingKey = leafIndexKeysForAddress.get(leafIndex)
-            if (conflictingKey !== undefined && conflictingKey !== keyBigInt) {
-                throw new Error(`Leaf index collision for address ${address.toString()}: storage key ${keyBigInt.toString()} conflicts with storage key ${conflictingKey.toString()} at leaf index ${leafIndex}`)
-            }
-
-            const normalizedValue = unpadBytes(entry.value)
-            const valueBigInt = normalizedValue.length === 0 ? 0n : bytesToBigInt(normalizedValue)
-            normalizedEntries.push({
-                key: entry.key,
-                value: normalizedValue,
-                keyBigInt,
-                valueBigInt,
-            })
-            storageEntriesForAddress.set(keyBigInt, valueBigInt)
-            keyLeafIndexesForAddress.set(keyBigInt, leafIndex)
-            leafIndexKeysForAddress.set(leafIndex, keyBigInt)
-        }
-
-        await this._modifyContractStorage(address, account, async (storageTrie, done) => {
-            for (const entry of normalizedEntries) {
-                if (entry.value.length === 0) {
-                    await storageTrie.del(entry.key)
-                } else {
-                    await storageTrie.put(entry.key, RLP.encode(entry.value))
-                }
-            }
-            done()
-        })
-
-        this._storageEntries.set(addressBigInt, storageEntriesForAddress)
-        this._storageKeyLeafIndexes.set(addressBigInt, keyLeafIndexesForAddress)
-        this._storageLeafIndexKeys.set(addressBigInt, leafIndexKeysForAddress)
-
-        for (const entry of normalizedEntries) {
-            merkleTrees.update(addressBigInt, entry.keyBigInt, entry.valueBigInt)
-        }
-    }
-
     private async _openAccount (address: Address): Promise<void> {
         const POSEIDON_RLP = poseidon(RLP.encode(new Uint8Array([])));
         const POSEIDON_NULL = poseidon(new Uint8Array(0));
@@ -144,7 +78,70 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
                 });
                 usedL1Keys.add(keyL1BigInt);
             }
-            await this._ingestStorageEntries(address, storageEntriesForAddress)
+            if (this._storageEntries === null) {
+                throw new Error('Storage entries are not initialized')
+            }
+            if (this._storageKeyLeafIndexes === null) {
+                throw new Error('Storage key leaf indexes are not initialized')
+            }
+            if (this._storageLeafIndexKeys === null) {
+                throw new Error('Storage leaf index keys are not initialized')
+            }
+
+            const merkleTrees = this._getMerkleTrees()
+            const account = await this.getAccount(address)
+            if (account === undefined) {
+                throw new Error(`Cannot initialize storage for missing account ${address.toString()}`)
+            }
+
+            const addressBigInt = bytesToBigInt(address.bytes)
+            const storageEntriesMapForAddress = new Map<bigint, bigint>()
+            const keyLeafIndexesForAddress = new Map<bigint, number>()
+            const leafIndexKeysForAddress = new Map<number, bigint>()
+            const normalizedEntries: { key: Uint8Array, value: Uint8Array, keyBigInt: bigint, valueBigInt: bigint }[] = []
+
+            for (const entry of storageEntriesForAddress) {
+                const keyBigInt = bytesToBigInt(entry.key)
+                if (keyLeafIndexesForAddress.has(keyBigInt)) {
+                    throw new Error(`Duplication in L2 MPT keys.`)
+                }
+                const leafIndex = TokamakL2MerkleTrees.getLeafIndex(keyBigInt)
+                const conflictingKey = leafIndexKeysForAddress.get(leafIndex)
+                if (conflictingKey !== undefined && conflictingKey !== keyBigInt) {
+                    throw new Error(`Leaf index collision for address ${address.toString()}: storage key ${keyBigInt.toString()} conflicts with storage key ${conflictingKey.toString()} at leaf index ${leafIndex}`)
+                }
+
+                const normalizedValue = unpadBytes(entry.value)
+                const valueBigInt = normalizedValue.length === 0 ? 0n : bytesToBigInt(normalizedValue)
+                normalizedEntries.push({
+                    key: entry.key,
+                    value: normalizedValue,
+                    keyBigInt,
+                    valueBigInt,
+                })
+                storageEntriesMapForAddress.set(keyBigInt, valueBigInt)
+                keyLeafIndexesForAddress.set(keyBigInt, leafIndex)
+                leafIndexKeysForAddress.set(leafIndex, keyBigInt)
+            }
+
+            await this._modifyContractStorage(address, account, async (storageTrie, done) => {
+                for (const entry of normalizedEntries) {
+                    if (entry.value.length === 0) {
+                        await storageTrie.del(entry.key)
+                    } else {
+                        await storageTrie.put(entry.key, RLP.encode(entry.value))
+                    }
+                }
+                done()
+            })
+
+            this._storageEntries.set(addressBigInt, storageEntriesMapForAddress)
+            this._storageKeyLeafIndexes.set(addressBigInt, keyLeafIndexesForAddress)
+            this._storageLeafIndexKeys.set(addressBigInt, leafIndexKeysForAddress)
+
+            for (const entry of normalizedEntries) {
+                merkleTrees.update(addressBigInt, entry.keyBigInt, entry.valueBigInt)
+            }
         }
         await this.flush();
     }
