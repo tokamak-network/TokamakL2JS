@@ -1,17 +1,13 @@
 import { MerkleStateManager } from "@ethereumjs/statemanager";
 import { MerkleTreeMembers, TokamakL2StateManagerRPCOpts, TokamakL2StateManagerSnapshotOpts } from "./types.js";
 import { StateManagerInterface } from "@ethereumjs/common";
-import { IMT, IMTHashFunction, IMTMerkleProof } from "@zk-kit/imt"
 import { addHexPrefix, Address, bigIntToBytes, bigIntToHex, bytesToBigInt, bytesToHex, concatBytes, createAccount, createAddressFromBigInt, createAddressFromString, hexToBigInt, hexToBytes, setLengthLeft } from "@ethereumjs/util";
 import { ethers } from "ethers";
 import { RLP } from "@ethereumjs/rlp";
-import { poseidon_raw } from "../crypto/index.js";
 import { StateSnapshot, StorageEntriesJson } from "../interface/channel/types.js";
-import { treeNodeToBigint } from "./utils.js";
 import { createTokamakL2Common } from "../common/index.js";
-import { MAX_MT_LEAVES, MT_DEPTH, NULL_LEAF } from "../interface/params/stateManager.js";
-import { POSEIDON_INPUTS } from "../interface/params/crypto.js";
-import { jubjub } from "@noble/curves/misc";
+import { MAX_MT_LEAVES } from "../interface/params/stateManager.js";
+import { TokamakL2MerkleTrees } from "./TokamakMerkleTrees.js";
 
 export class TokamakL2StateManager extends MerkleStateManager implements StateManagerInterface {
     private _storageEntries: MerkleTreeMembers | null = null
@@ -210,57 +206,5 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             storageAddresses: this._storageAddresses.map(addr => addr.toString()),
             storageEntries,
         };
-    }
-}
-
-export class TokamakL2MerkleTrees {
-    private _trees: Map<bigint, IMT>; // Map<address, tree>
-
-    constructor(addresses: Address[]) {
-        this._trees = new Map<bigint, IMT>();
-        addresses.forEach(addr => this._trees.set(
-            bytesToBigInt(addr.bytes),
-            new IMT(poseidon_raw as IMTHashFunction, MT_DEPTH, NULL_LEAF, POSEIDON_INPUTS, Array(MAX_MT_LEAVES).fill(NULL_LEAF))
-        ));
-    }
-
-    public get trees() {
-        return this._trees
-    }
-    
-    public update(address: bigint, key: bigint, value: bigint): bigint {
-        const tree = this._trees.get(address);
-        if (tree === undefined) {
-            throw new Error(`Merkle tree is not registered for the address ${address.toString()}`);
-        }
-        const leafIndex = TokamakL2MerkleTrees.getLeafIndex(key);
-        const leaf = value % jubjub.Point.Fp.ORDER;
-        tree.update(leafIndex, leaf);
-        return leaf
-    }
-
-    public static getLeafIndex(key: bigint): number {
-        return Number(key % BigInt(MAX_MT_LEAVES));
-    }
-
-    public getRoot(address: Address): bigint {
-        const tree = this._trees.get(bytesToBigInt(address.bytes));
-        if (tree === undefined) {
-            throw new Error(`Merkle tree is not registered for the address ${address.toString()}`);
-        }
-        return treeNodeToBigint(tree.root);
-    }
-
-    public getRoots(addresses: Address[]): bigint[] {
-        return addresses.map(addr => this.getRoot(addr));
-    }
-
-    public getProof(address: Address, key: bigint): IMTMerkleProof {
-        const addressBigInt = bytesToBigInt(address.bytes);
-        const tree = this._trees.get(addressBigInt);
-        if (tree === undefined) {
-            throw new Error(`Merkle tree is not registered for the address ${address.toString()}`);
-        }
-        return tree.createProof(TokamakL2MerkleTrees.getLeafIndex(key));
     }
 }
