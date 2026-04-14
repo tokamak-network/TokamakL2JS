@@ -1,13 +1,13 @@
 import { MerkleStateManager } from "@ethereumjs/statemanager";
 import { MerkleTreeMembers, TokamakL2StateManagerRPCOpts, TokamakL2StateManagerSnapshotOpts } from "./types.js";
 import { StateManagerInterface } from "@ethereumjs/common";
-import { addHexPrefix, Address, bigIntToBytes, bigIntToHex, bytesToBigInt, bytesToHex, concatBytes, createAccount, createAddressFromString, hexToBigInt, hexToBytes, setLengthLeft, unpadBytes } from "@ethereumjs/util";
+import { addHexPrefix, Address, bigIntToBytes, bigIntToHex, bytesToBigInt, bytesToHex, concatBytes, createAccount, createAddressFromString, hexToBigInt, hexToBytes, setLengthLeft } from "@ethereumjs/util";
 import { ethers } from "ethers";
 import { RLP } from "@ethereumjs/rlp";
 import { StateSnapshot, StorageKeysJson, StorageTrieDbEntryJson } from "../interface/channel/types.js";
 import { deriveStorageTrieKeyPrefix, readStorageEntriesFromStorageTrie } from "../interface/channel/utils.js";
 import { TokamakL2MerkleTrees } from "./TokamakMerkleTrees.js";
-import { assertSnapshotStorageShape, assertStorageEntryCapacity } from "./utils.js";
+import { _normalizeStorageEntries, assertSnapshotStorageShape, assertStorageEntryCapacity } from "./utils.js";
 
 export class TokamakL2StateManager extends MerkleStateManager implements StateManagerInterface {
     private _storageEntries: MerkleTreeMembers | null = null
@@ -156,16 +156,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
                 usedL1Keys.add(keyL1BigInt);
             }
             const account = await this._getRequiredAccount(address)
-            const normalizedEntries = storageEntriesForAddress.map((entry) => {
-                const normalizedValue = unpadBytes(entry.value)
-
-                return {
-                    key: entry.key,
-                    value: normalizedValue,
-                    keyBigInt: bytesToBigInt(entry.key),
-                    valueBigInt: normalizedValue.length === 0 ? 0n : bytesToBigInt(normalizedValue),
-                }
-            })
+            const normalizedEntries = _normalizeStorageEntries(storageEntriesForAddress)
 
             await this._modifyContractStorage(address, account, async (storageTrie, done) => {
                 for (const entry of normalizedEntries) {
@@ -215,16 +206,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
                 key: hexToBytes(addHexPrefix(entry.key)),
                 value: hexToBytes(addHexPrefix(entry.value)),
             }))
-            const normalizedEntries = storageEntriesForAddress.map((entry) => {
-                const normalizedValue = unpadBytes(entry.value)
-
-                return {
-                    key: entry.key,
-                    value: normalizedValue,
-                    keyBigInt: bytesToBigInt(entry.key),
-                    valueBigInt: normalizedValue.length === 0 ? 0n : bytesToBigInt(normalizedValue),
-                }
-            })
+            const normalizedEntries = _normalizeStorageEntries(storageEntriesForAddress)
 
             this._commitResolvedStorageEntries(address, normalizedEntries)
         }

@@ -1,5 +1,5 @@
 import { IMTNode } from "@zk-kit/imt";
-import { addHexPrefix, hexToBigInt } from "@ethereumjs/util";
+import { addHexPrefix, bytesToBigInt, hexToBigInt, unpadBytes } from "@ethereumjs/util";
 import { StateSnapshot } from "../interface/channel/types.js";
 import { MAX_MT_LEAVES } from "../interface/params/stateManager.js";
 
@@ -29,4 +29,22 @@ export const assertSnapshotStorageShape = (snapshot: StateSnapshot): void => {
     ) {
         throw new Error('Snapshot is expected to have storage keys, trie roots, and trie nodes for each state root')
     }
+}
+
+export const _normalizeStorageEntries = (entries: { key: Uint8Array, value: Uint8Array }[]): {
+    key: Uint8Array,
+    value: Uint8Array,
+    keyBigInt: bigint,
+    valueBigInt: bigint,
+}[] => {
+    return entries.map((entry) => {
+        const normalizedValue = unpadBytes(entry.value)
+
+        return {
+            key: entry.key,
+            value: normalizedValue,
+            keyBigInt: bytesToBigInt(entry.key),
+            valueBigInt: normalizedValue.length === 0 ? 0n : bytesToBigInt(normalizedValue),
+        }
+    })
 }
