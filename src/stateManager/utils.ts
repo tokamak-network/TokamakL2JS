@@ -1,6 +1,9 @@
+import { MerklePatriciaTrie } from "@ethereumjs/mpt";
+import { RLP } from "@ethereumjs/rlp";
 import { IMTNode } from "@zk-kit/imt";
-import { addHexPrefix, bytesToBigInt, hexToBigInt, unpadBytes } from "@ethereumjs/util";
-import { StateSnapshot } from "../interface/channel/types.js";
+import { addHexPrefix, bytesToBigInt, bytesToHex, hexToBigInt, hexToBytes, MapDB, unpadBytes } from "@ethereumjs/util";
+import { createTokamakL2Common } from "../common/index.js";
+import { StateSnapshot, StorageEntryJson } from "../interface/channel/types.js";
 import { MAX_MT_LEAVES } from "../interface/params/stateManager.js";
 
 export const treeNodeToBigint = (node: IMTNode): bigint => {
@@ -47,4 +50,75 @@ export const _normalizeStorageEntries = (entries: { key: Uint8Array, value: Uint
             valueBigInt: normalizedValue.length === 0 ? 0n : bytesToBigInt(normalizedValue),
         }
     })
+}
+
+export const getStorageTrieKeyPrefix = (
+    snapshot: StateSnapshot,
+    storageAddressIndex: number,
+): Uint8Array | undefined => {
+    const rootHexWithoutPrefix = addHexPrefix(snapshot.storageTrieRoots[storageAddressIndex]).slice(2);
+    for (const entry of snapshot.storageTrieDb[storageAddressIndex]) {
+        const dbKeyWithoutPrefix = addHexPrefix(entry.key).slice(2);
+        if (dbKeyWithoutPrefix === rootHexWithoutPrefix) {
+            return undefined;
+        }
+        if (dbKeyWithoutPrefix.endsWith(rootHexWithoutPrefix)) {
+            const keyPrefixHex = dbKeyWithoutPrefix.slice(0, dbKeyWithoutPrefix.length - rootHexWithoutPrefix.length);
+            return keyPrefixHex.length === 0 ? undefined : hexToBytes(addHexPrefix(keyPrefixHex));
+        }
+    }
+
+    if (snapshot.storageTrieDb[storageAddressIndex].length === 0) {
+        return undefined;
+    }
+
+    throw new Error(
+        `Storage trie root ${snapshot.storageTrieRoots[storageAddressIndex]} does not have a matching trie DB entry at index ${storageAddressIndex}`,
+    );
+}
+
+export const createStorageTrieFromSnapshot = async (
+    snapshot: StateSnapshot,
+    storageAddressIndex: number,
+): Promise<MerklePatriciaTrie> => {
+    const common = createTokamakL2Common();
+    const trie = new MerklePatriciaTrie({
+        useKeyHashing: true,
+        common,
+        keyPrefix: getStorageTrieKeyPrefix(snapshot, storageAddressIndex),
+        db: new MapDB<string, Uint8Array>(),
+    });
+
+    const trieDbOps = snapshot.storageTrieDb[storageAddressIndex].map((entry) => ({
+        type: "put" as const,
+        key: addHexPrefix(entry.key).slice(2),
+        value: hexToBytes(addHexPrefix(entry.value)),
+    }));
+    await trie.database().db.batch(trieDbOps);
+    trie.root(hexToBytes(addHexPrefix(snapshot.storageTrieRoots[storageAddressIndex])));
+
+    return trie;
+}
+
+export const readStorageValueFromTrie = async (
+    trie: MerklePatriciaTrie,
+    storageKey: Uint8Array | string,
+): Promise<string> => {
+    const normalizedStorageKey =
+        typeof storageKey === "string" ? hexToBytes(addHexPrefix(storageKey)) : storageKey;
+    const encodedValue = await trie.get(normalizedStorageKey);
+    const decodedValue = encodedValue === null ? new Uint8Array() : (RLP.decode(encodedValue) as Uint8Array);
+    return bytesToHex(unpadBytes(decodedValue));
+}
+
+export const readStorageEntriesFromStorageTrie = async (
+    storageKeys: string[],
+    storageTrie: MerklePatriciaTrie,
+): Promise<StorageEntryJson[]> => {
+    return Promise.all(
+        storageKeys.map(async (storageKey) => ({
+            key: addHexPrefix(storageKey),
+            value: await readStorageValueFromTrie(storageTrie, storageKey),
+        })),
+    );
 }
