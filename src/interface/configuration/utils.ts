@@ -8,7 +8,8 @@ import {
 } from "@ethereumjs/util";
 import { jubjub } from "@noble/curves/misc.js";
 import { TokamakL2StateManagerRPCOpts } from "../../stateManager/types.js";
-import { fromEdwardsToAddress, getUserStorageKey } from "../../utils/index.js";
+import { fromEdwardsToAddress } from "../../crypto/utils.js";
+import { getUserStorageKey } from "../../stateManager/utils.js";
 import { deriveL2KeysFromSignature } from "../wallet/index.js";
 import { ChannelStateConfig } from "./types.js";
 

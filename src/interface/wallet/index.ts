@@ -2,7 +2,8 @@ import { utf8ToBytes } from "ethereum-cryptography/utils";
 import { poseidon } from "../../crypto/index.js";
 import { jubjub } from "@noble/curves/misc.js";
 import { bigIntToBytes, bytesToBigInt, bytesToHex, setLengthLeft } from "@ethereumjs/util";
-import { fromEdwardsToAddress, getUserStorageKey } from "../../utils/index.js";
+import { fromEdwardsToAddress } from "../../crypto/utils.js";
+import { getUserStorageKey } from "../../stateManager/utils.js";
 
 export const L2_PRV_KEY_MESSAGE='Tokamak-Private-App-Channel-'
 
@@ -36,5 +37,4 @@ export const deriveL2MptKeyFromAddress = (address: `0x${string}`, slotIndex: num
   const mptKey = getUserStorageKey([address, slotIndex], 'TokamakL2');
   return bytesToHex(mptKey)
 };
-
 

@@ -1,11 +1,13 @@
 import { MerklePatriciaTrie } from "@ethereumjs/mpt";
 import { RLP } from "@ethereumjs/rlp";
 import { IMTNode } from "@zk-kit/imt";
-import { addHexPrefix, Address, bytesToBigInt, bytesToHex, hexToBigInt, hexToBytes, MapDB, unpadBytes } from "@ethereumjs/util";
+import { addHexPrefix, Address, bigIntToBytes, bytesToBigInt, bytesToHex, concatBytes, hexToBigInt, hexToBytes, MapDB, setLengthLeft, unpadBytes } from "@ethereumjs/util";
 import { createTokamakL2Common } from "../common/index.js";
 import { StateSnapshot, StorageEntryJson } from "../interface/channel/types.js";
 import { MAX_MT_LEAVES } from "../interface/params/stateManager.js";
 import { getStorageTrieKeyPrefix } from "../interface/channel/utils.js";
+import { poseidon } from "../crypto/index.js";
+import { keccak256 } from "ethereum-cryptography/keccak";
 
 export const treeNodeToBigint = (node: IMTNode): bigint => {
     if (typeof node === "bigint") {
@@ -51,6 +53,44 @@ export const _normalizeStorageEntries = (entries: { key: Uint8Array, value: Uint
             valueBigInt: normalizedValue.length === 0 ? 0n : bytesToBigInt(normalizedValue),
         }
     })
+}
+
+export function getUserStorageKey(parts: Array<Address | number | bigint | string>, layer: 'L1' | 'TokamakL2'): Uint8Array {
+    const bytesArray: Uint8Array[] = []
+
+    for (const p of parts) {
+        let b: Uint8Array
+
+        if (p instanceof Address) {
+            b = p.toBytes()
+        } else if (typeof p === 'number') {
+            b = bigIntToBytes(BigInt(p))
+        } else if (typeof p === 'bigint') {
+            b = bigIntToBytes(p)
+        } else if (typeof p === 'string') {
+            b = hexToBytes(addHexPrefix(p))
+        } else {
+            throw new Error('getStorageKey accepts only Address | number | bigint | string');
+        }
+
+        bytesArray.push(setLengthLeft(b, 32))
+    }
+    const packed = concatBytes(...bytesArray)
+    let hash: (input: Uint8Array) => Uint8Array
+    switch (layer) {
+        case 'L1': {
+            hash = keccak256;
+            break;
+        }
+        case 'TokamakL2': {
+            hash = poseidon;
+            break;
+        }
+        default: {
+            throw new Error(`Error while making a user's storage key: Undefined layer "${layer}"`)
+        }
+    }
+    return hash(packed)
 }
 
 export const deriveStorageTrieKeyPrefix = (
