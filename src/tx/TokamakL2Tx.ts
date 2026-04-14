@@ -3,12 +3,10 @@ import { LegacyTx, TransactionInterface, TransactionType, TxValuesArray as AllTy
 import { EthereumJSErrorWithoutCode, RLP } from "@ethereumjs/rlp"
 import { jubjub } from "@noble/curves/misc.js"
 import { EdwardsPoint } from "@noble/curves/abstract/edwards.js"
-import { eddsaSign, eddsaVerify, getEddsaPublicKey, poseidon } from "../crypto/index.js"
+import { eddsaSign, eddsaVerify, getEddsaPublicKey } from "../crypto/index.js"
 import { FUNCTION_INPUT_LENGTH } from "../interface/params/index.js"
 import { TxSnapshot } from "../interface/channel/types.js"
 import { fromEdwardsToAddress } from "../crypto/utils.js"
-import { batchBigIntTo32BytesEach } from "../utils/index.js"
-import { createTokamakL2Tx } from "./constructors.js"
 
 // LegacyTx prohibits to add new members for extension. Bypassing this problem by the follow:
 const _unsafeSenderPubKeyStorage = new WeakMap<TokamakL2Tx, Uint8Array>();
