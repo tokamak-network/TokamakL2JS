@@ -129,24 +129,6 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         return account
     }
 
-    private _normalizeStorageEntries(entries: { key: Uint8Array, value: Uint8Array }[]): {
-        key: Uint8Array,
-        value: Uint8Array,
-        keyBigInt: bigint,
-        valueBigInt: bigint,
-    }[] {
-        return entries.map((entry) => {
-            const normalizedValue = unpadBytes(entry.value)
-
-            return {
-                key: entry.key,
-                value: normalizedValue,
-                keyBigInt: bytesToBigInt(entry.key),
-                valueBigInt: normalizedValue.length === 0 ? 0n : bytesToBigInt(normalizedValue),
-            }
-        })
-    }
-
     public async initTokamakExtendsFromRPC(rpcUrl: string, opts: TokamakL2StateManagerRPCOpts): Promise<void> {
         for (const storageConfig of opts.storageConfig) {
             assertStorageEntryCapacity(storageConfig.keyPairs.length, storageConfig.address.toString())
@@ -174,7 +156,16 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
                 usedL1Keys.add(keyL1BigInt);
             }
             const account = await this._getRequiredAccount(address)
-            const normalizedEntries = this._normalizeStorageEntries(storageEntriesForAddress)
+            const normalizedEntries = storageEntriesForAddress.map((entry) => {
+                const normalizedValue = unpadBytes(entry.value)
+
+                return {
+                    key: entry.key,
+                    value: normalizedValue,
+                    keyBigInt: bytesToBigInt(entry.key),
+                    valueBigInt: normalizedValue.length === 0 ? 0n : bytesToBigInt(normalizedValue),
+                }
+            })
 
             await this._modifyContractStorage(address, account, async (storageTrie, done) => {
                 for (const entry of normalizedEntries) {
@@ -224,7 +215,16 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
                 key: hexToBytes(addHexPrefix(entry.key)),
                 value: hexToBytes(addHexPrefix(entry.value)),
             }))
-            const normalizedEntries = this._normalizeStorageEntries(storageEntriesForAddress)
+            const normalizedEntries = storageEntriesForAddress.map((entry) => {
+                const normalizedValue = unpadBytes(entry.value)
+
+                return {
+                    key: entry.key,
+                    value: normalizedValue,
+                    keyBigInt: bytesToBigInt(entry.key),
+                    valueBigInt: normalizedValue.length === 0 ? 0n : bytesToBigInt(normalizedValue),
+                }
+            })
 
             this._commitResolvedStorageEntries(address, normalizedEntries)
         }
