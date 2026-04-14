@@ -12,6 +12,7 @@ import {
 import { createTokamakL2Common } from "../../common/index.js";
 import {
   StateSnapshot,
+  StorageEntryJson,
   StorageEntriesJson,
 } from "./types.js";
 
@@ -107,6 +108,18 @@ async function readStorageValueFromTrie(trie: MerklePatriciaTrie, storageKey: Ui
   return bytesToHex(unpadBytes(decodedValue));
 }
 
+export async function readStorageEntriesFromStorageTrie(
+  storageKeys: string[],
+  storageTrie: MerklePatriciaTrie,
+): Promise<StorageEntryJson[]> {
+  return Promise.all(
+    storageKeys.map(async (storageKey) => ({
+      key: addHexPrefix(storageKey),
+      value: await readStorageValueFromTrie(storageTrie, storageKey),
+    })),
+  );
+}
+
 export async function readStorageValueFromStateSnapshot(
   snapshot: StateSnapshot,
   storageAddress: Address | string,
@@ -124,12 +137,7 @@ export async function readStorageEntriesFromStateSnapshot(
 
   for (const [storageAddressIndex, storageKeys] of snapshot.storageKeys.entries()) {
     const trie = await createStorageTrieFromSnapshot(snapshot, storageAddressIndex);
-    const entriesForAddress = await Promise.all(
-      storageKeys.map(async (storageKey) => ({
-        key: addHexPrefix(storageKey),
-        value: await readStorageValueFromTrie(trie, storageKey),
-      })),
-    );
+    const entriesForAddress = await readStorageEntriesFromStorageTrie(storageKeys, trie);
     storageEntries.push(entriesForAddress);
   }
 

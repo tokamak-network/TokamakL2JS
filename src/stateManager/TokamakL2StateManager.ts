@@ -5,7 +5,7 @@ import { addHexPrefix, Address, bigIntToBytes, bigIntToHex, bytesToBigInt, bytes
 import { ethers } from "ethers";
 import { RLP } from "@ethereumjs/rlp";
 import { StateSnapshot, StorageKeysJson, StorageTrieDbEntryJson } from "../interface/channel/types.js";
-import { deriveStorageTrieKeyPrefix, readStorageEntriesFromStateSnapshot } from "../interface/channel/utils.js";
+import { deriveStorageTrieKeyPrefix, readStorageEntriesFromStorageTrie } from "../interface/channel/utils.js";
 import { TokamakL2MerkleTrees } from "./TokamakMerkleTrees.js";
 import { assertSnapshotStorageShape, assertStorageEntryCapacity } from "./utils.js";
 
@@ -120,6 +120,33 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         await this.putAccount(address, contractAccount);
     }
 
+    private async _getRequiredAccount(address: Address) {
+        const account = await this.getAccount(address)
+        if (account === undefined) {
+            throw new Error(`Cannot initialize storage for missing account ${address.toString()}`)
+        }
+
+        return account
+    }
+
+    private _normalizeStorageEntries(entries: { key: Uint8Array, value: Uint8Array }[]): {
+        key: Uint8Array,
+        value: Uint8Array,
+        keyBigInt: bigint,
+        valueBigInt: bigint,
+    }[] {
+        return entries.map((entry) => {
+            const normalizedValue = unpadBytes(entry.value)
+
+            return {
+                key: entry.key,
+                value: normalizedValue,
+                keyBigInt: bytesToBigInt(entry.key),
+                valueBigInt: normalizedValue.length === 0 ? 0n : bytesToBigInt(normalizedValue),
+            }
+        })
+    }
+
     public async initTokamakExtendsFromRPC(rpcUrl: string, opts: TokamakL2StateManagerRPCOpts): Promise<void> {
         for (const storageConfig of opts.storageConfig) {
             assertStorageEntryCapacity(storageConfig.keyPairs.length, storageConfig.address.toString())
@@ -146,24 +173,8 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
                 });
                 usedL1Keys.add(keyL1BigInt);
             }
-            const account = await this.getAccount(address)
-            if (account === undefined) {
-                throw new Error(`Cannot initialize storage for missing account ${address.toString()}`)
-            }
-
-            const normalizedEntries: { key: Uint8Array, value: Uint8Array, keyBigInt: bigint, valueBigInt: bigint }[] = []
-
-            for (const entry of storageEntriesForAddress) {
-                const keyBigInt = bytesToBigInt(entry.key)
-                const normalizedValue = unpadBytes(entry.value)
-                const valueBigInt = normalizedValue.length === 0 ? 0n : bytesToBigInt(normalizedValue)
-                normalizedEntries.push({
-                    key: entry.key,
-                    value: normalizedValue,
-                    keyBigInt,
-                    valueBigInt,
-                })
-            }
+            const account = await this._getRequiredAccount(address)
+            const normalizedEntries = this._normalizeStorageEntries(storageEntriesForAddress)
 
             await this._modifyContractStorage(address, account, async (storageTrie, done) => {
                 for (const entry of normalizedEntries) {
@@ -185,7 +196,6 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         assertSnapshotStorageShape(snapshot)
         this._channelId = snapshot.channelId;
         const storageAddresses = snapshot.storageAddresses.map(addrStr => createAddressFromString(addrStr))
-        const snapshotStorageEntries = await readStorageEntriesFromStateSnapshot(snapshot)
         await this._initializeForAddresses(storageAddresses)
         for (const codeInfo of opts.contractCodes) {
             await this.putCode(codeInfo.address, hexToBytes(codeInfo.code));
@@ -194,10 +204,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         for (const [idx, addressString] of snapshot.storageAddresses.entries()) {
             assertStorageEntryCapacity(snapshot.storageKeys[idx].length, addressString)
             const address = createAddressFromString(addressString);
-            const account = await this.getAccount(address)
-            if (account === undefined) {
-                throw new Error(`Cannot initialize storage for missing account ${address.toString()}`)
-            }
+            const account = await this._getRequiredAccount(address)
 
             const trieDbOps = snapshot.storageTrieDb[idx].map((entry) => ({
                 type: 'put' as const,
@@ -209,14 +216,15 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             account.storageRoot = hexToBytes(addHexPrefix(snapshot.storageTrieRoots[idx]))
             await this.putAccount(address, account)
 
-            const normalizedEntries: { keyBigInt: bigint, valueBigInt: bigint }[] = []
-
-            for (const entry of snapshotStorageEntries[idx]) {
-                const keyBigInt = hexToBigInt(addHexPrefix(entry.key))
-                const normalizedValue = hexToBytes(addHexPrefix(entry.value))
-                const valueBigInt = normalizedValue.length === 0 ? 0n : bytesToBigInt(normalizedValue)
-                normalizedEntries.push({ keyBigInt, valueBigInt })
-            }
+            const storageTrie = this._getStorageTrie(address, account)
+            const storageEntriesForAddress = (await readStorageEntriesFromStorageTrie(
+                snapshot.storageKeys[idx],
+                storageTrie,
+            )).map((entry) => ({
+                key: hexToBytes(addHexPrefix(entry.key)),
+                value: hexToBytes(addHexPrefix(entry.value)),
+            }))
+            const normalizedEntries = this._normalizeStorageEntries(storageEntriesForAddress)
 
             this._commitResolvedStorageEntries(address, normalizedEntries)
         }
