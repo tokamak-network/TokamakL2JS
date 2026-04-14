@@ -111,19 +111,20 @@ export class TokamakL2Tx extends LegacyTx implements TransactionInterface<typeof
         const sBigint = typeof s === 'bigint' ? s : bytesToBigInt(s)
 
         const opts = { ...this.txOptions, common: this.common }
-
-        return createTokamakL2Tx(
-            {
+        const tx = new TokamakL2Tx({
                 nonce: this.nonce,
                 to: this.to,
                 data: this.data,
-                senderPubKey: this.senderPubKeyUnsafe,
                 v: 27n,
                 r: rBigint,
                 s: sBigint,
-            },
-            opts,
-        )
+                gasLimit: this.gasLimit,
+                gasPrice: this.gasPrice,
+            }, 
+            opts
+        );
+        tx.initUnsafeSenderPubKey(this.senderPubKeyUnsafe);
+        return tx
     }
 
     override raw(): TxValuesArray {

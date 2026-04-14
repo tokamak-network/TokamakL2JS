@@ -1,12 +1,12 @@
 import { MerkleStateManager } from "@ethereumjs/statemanager";
 import { MerkleTreeMembers, TokamakL2StateManagerRPCOpts, TokamakL2StateManagerSnapshotOpts } from "./types.js";
 import { StateManagerInterface } from "@ethereumjs/common";
-import { addHexPrefix, Address, bigIntToBytes, bigIntToHex, bytesToBigInt, bytesToHex, concatBytes, createAccount, createAddressFromString, hexToBigInt, hexToBytes, setLengthLeft } from "@ethereumjs/util";
+import { addHexPrefix, Address, bigIntToBytes, bigIntToHex, bytesToBigInt, bytesToHex, createAccount, createAddressFromString, hexToBigInt, hexToBytes, setLengthLeft } from "@ethereumjs/util";
 import { ethers } from "ethers";
 import { RLP } from "@ethereumjs/rlp";
 import { StateSnapshot, StorageKeysJson, StorageTrieDbEntryJson } from "../interface/channel/types.js";
 import { TokamakL2MerkleTrees } from "./TokamakMerkleTrees.js";
-import { _normalizeStorageEntries, assertSnapshotStorageShape, assertStorageEntryCapacity, deriveStorageTrieKeyPrefix, readStorageEntriesFromStorageTrie } from "./utils.js";
+import { _normalizeStorageEntries, assertSnapshotStorageShape, assertStorageEntryCapacity, readStorageEntriesFromStorageTrie } from "./utils.js";
 
 export class TokamakL2StateManager extends MerkleStateManager implements StateManagerInterface {
     private _storageEntries: MerkleTreeMembers | null = null
@@ -316,11 +316,6 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
                 continue
             }
 
-            const keyPrefix = deriveStorageTrieKeyPrefix(
-                this._prefixStorageTrieKeys,
-                address,
-                this.common.customCrypto.keccak256,
-            )
             const currentStorageTrieDb: StorageTrieDbEntryJson[] = []
             const seen = new Set<string>()
 
@@ -331,10 +326,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
                     continue
                 }
 
-                let dbKey = isRoot ? storageTrie.root() : (storageTrie as unknown as { hash: (msg: Uint8Array) => Uint8Array }).hash(encoded)
-                if (keyPrefix !== undefined) {
-                    dbKey = concatBytes(keyPrefix, dbKey)
-                }
+                const dbKey = isRoot ? storageTrie.root() : (storageTrie as unknown as { hash: (msg: Uint8Array) => Uint8Array }).hash(encoded)
 
                 const keyHex = bytesToHex(dbKey)
                 if (seen.has(keyHex)) {

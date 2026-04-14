@@ -5,7 +5,6 @@ import { addHexPrefix, Address, bigIntToBytes, bytesToBigInt, bytesToHex, concat
 import { createTokamakL2Common } from "../common/index.js";
 import { StateSnapshot, StorageEntryJson } from "../interface/channel/types.js";
 import { MAX_MT_LEAVES } from "../interface/params/stateManager.js";
-import { getStorageTrieKeyPrefix } from "../interface/channel/utils.js";
 import { poseidon } from "../crypto/index.js";
 import { keccak256 } from "ethereum-cryptography/keccak";
 
@@ -93,22 +92,6 @@ export function getUserStorageKey(parts: Array<Address | number | bigint | strin
     return hash(packed)
 }
 
-export const deriveStorageTrieKeyPrefix = (
-    prefixStorageTrieKeys: boolean,
-    address: Address,
-    keccak256: ((msg: Uint8Array) => Uint8Array) | undefined,
-): Uint8Array | undefined => {
-    if (!prefixStorageTrieKeys) {
-        return undefined;
-    }
-    if (keccak256 === undefined) {
-        throw new Error("customCrypto.keccak256 must be defined when storage trie key prefixing is enabled");
-    }
-
-    const addressBytes = keccak256(address.bytes);
-    return addressBytes.slice(0, 7);
-}
-
 export const createStorageTrieFromSnapshot = async (
     snapshot: StateSnapshot,
     storageAddressIndex: number,
@@ -117,7 +100,6 @@ export const createStorageTrieFromSnapshot = async (
     const trie = new MerklePatriciaTrie({
         useKeyHashing: true,
         common,
-        keyPrefix: getStorageTrieKeyPrefix(snapshot, storageAddressIndex),
         db: new MapDB<string, Uint8Array>(),
     });
 

@@ -1,8 +1,6 @@
 import {
-  addHexPrefix,
   Address,
   createAddressFromString,
-  hexToBytes,
 } from "@ethereumjs/util";
 import {
   StateSnapshot,
@@ -35,31 +33,6 @@ function getStorageAddressIndex(snapshot: StateSnapshot, storageAddress: Address
 
   return index;
 }
-
-export const getStorageTrieKeyPrefix = (
-  snapshot: StateSnapshot,
-  storageAddressIndex: number,
-): Uint8Array | undefined => {
-  const rootHexWithoutPrefix = addHexPrefix(snapshot.storageTrieRoots[storageAddressIndex]).slice(2);
-  for (const entry of snapshot.storageTrieDb[storageAddressIndex]) {
-    const dbKeyWithoutPrefix = addHexPrefix(entry.key).slice(2);
-    if (dbKeyWithoutPrefix === rootHexWithoutPrefix) {
-      return undefined;
-    }
-    if (dbKeyWithoutPrefix.endsWith(rootHexWithoutPrefix)) {
-      const keyPrefixHex = dbKeyWithoutPrefix.slice(0, dbKeyWithoutPrefix.length - rootHexWithoutPrefix.length);
-      return keyPrefixHex.length === 0 ? undefined : hexToBytes(addHexPrefix(keyPrefixHex));
-    }
-  }
-
-  if (snapshot.storageTrieDb[storageAddressIndex].length === 0) {
-    return undefined;
-  }
-
-  throw new Error(
-    `Storage trie root ${snapshot.storageTrieRoots[storageAddressIndex]} does not have a matching trie DB entry at index ${storageAddressIndex}`,
-  );
-};
 
 export { readStorageEntriesFromStorageTrie } from "../../stateManager/utils.js";
 
