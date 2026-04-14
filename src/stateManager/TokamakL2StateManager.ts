@@ -6,7 +6,7 @@ import { ethers } from "ethers";
 import { RLP } from "@ethereumjs/rlp";
 import { StateSnapshot, StorageKeysJson, StorageTrieDbEntryJson } from "../interface/channel/types.js";
 import { TokamakL2MerkleTrees } from "./TokamakMerkleTrees.js";
-import { assertSnapshotStorageShape, assertStorageEntryCapacity } from "./utils.js";
+import { assertSnapshotStorageShape, assertStorageEntryCapacity, deriveStorageTrieKeyPrefix } from "./utils.js";
 
 export class TokamakL2StateManager extends MerkleStateManager implements StateManagerInterface {
     private _storageEntries: MerkleTreeMembers | null = null
@@ -331,16 +331,11 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
                 continue
             }
 
-            let keyPrefix: Uint8Array | undefined
-            // Copy the keyPrefix derivation used by @ethereumjs/statemanager v10.1.1 MerkleStateManager when it creates storage tries.
-            if (this._prefixStorageTrieKeys) {
-                const keccak256 = this.common.customCrypto.keccak256
-                if (keccak256 === undefined) {
-                    throw new Error('customCrypto.keccak256 must be defined when storage trie key prefixing is enabled')
-                }
-                const addressBytes = keccak256(address.bytes)
-                keyPrefix = addressBytes.slice(0, 7)
-            }
+            const keyPrefix = deriveStorageTrieKeyPrefix(
+                this._prefixStorageTrieKeys,
+                address,
+                this.common.customCrypto.keccak256,
+            )
             const currentStorageTrieDb: StorageTrieDbEntryJson[] = []
             const seen = new Set<string>()
 

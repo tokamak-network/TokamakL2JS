@@ -16,6 +16,13 @@ export type StorageTrieDbEntryJson = {
 
 export type StorageTrieDbJson = StorageTrieDbEntryJson[][]
 
+export type StorageEntryJson = {
+  key: string;
+  value: string;
+}
+
+export type StorageEntriesJson = StorageEntryJson[][]
+
 export type TxSnapshot = {
   nonce: number;
   to: string;
