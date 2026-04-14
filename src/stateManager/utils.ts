@@ -1,10 +1,11 @@
 import { MerklePatriciaTrie } from "@ethereumjs/mpt";
 import { RLP } from "@ethereumjs/rlp";
 import { IMTNode } from "@zk-kit/imt";
-import { addHexPrefix, bytesToBigInt, bytesToHex, hexToBigInt, hexToBytes, MapDB, unpadBytes } from "@ethereumjs/util";
+import { addHexPrefix, Address, bytesToBigInt, bytesToHex, hexToBigInt, hexToBytes, MapDB, unpadBytes } from "@ethereumjs/util";
 import { createTokamakL2Common } from "../common/index.js";
 import { StateSnapshot, StorageEntryJson } from "../interface/channel/types.js";
 import { MAX_MT_LEAVES } from "../interface/params/stateManager.js";
+import { getStorageTrieKeyPrefix } from "../interface/channel/utils.js";
 
 export const treeNodeToBigint = (node: IMTNode): bigint => {
     if (typeof node === "bigint") {
@@ -52,29 +53,20 @@ export const _normalizeStorageEntries = (entries: { key: Uint8Array, value: Uint
     })
 }
 
-export const getStorageTrieKeyPrefix = (
-    snapshot: StateSnapshot,
-    storageAddressIndex: number,
+export const deriveStorageTrieKeyPrefix = (
+    prefixStorageTrieKeys: boolean,
+    address: Address,
+    keccak256: ((msg: Uint8Array) => Uint8Array) | undefined,
 ): Uint8Array | undefined => {
-    const rootHexWithoutPrefix = addHexPrefix(snapshot.storageTrieRoots[storageAddressIndex]).slice(2);
-    for (const entry of snapshot.storageTrieDb[storageAddressIndex]) {
-        const dbKeyWithoutPrefix = addHexPrefix(entry.key).slice(2);
-        if (dbKeyWithoutPrefix === rootHexWithoutPrefix) {
-            return undefined;
-        }
-        if (dbKeyWithoutPrefix.endsWith(rootHexWithoutPrefix)) {
-            const keyPrefixHex = dbKeyWithoutPrefix.slice(0, dbKeyWithoutPrefix.length - rootHexWithoutPrefix.length);
-            return keyPrefixHex.length === 0 ? undefined : hexToBytes(addHexPrefix(keyPrefixHex));
-        }
-    }
-
-    if (snapshot.storageTrieDb[storageAddressIndex].length === 0) {
+    if (!prefixStorageTrieKeys) {
         return undefined;
     }
+    if (keccak256 === undefined) {
+        throw new Error("customCrypto.keccak256 must be defined when storage trie key prefixing is enabled");
+    }
 
-    throw new Error(
-        `Storage trie root ${snapshot.storageTrieRoots[storageAddressIndex]} does not have a matching trie DB entry at index ${storageAddressIndex}`,
-    );
+    const addressBytes = keccak256(address.bytes);
+    return addressBytes.slice(0, 7);
 }
 
 export const createStorageTrieFromSnapshot = async (

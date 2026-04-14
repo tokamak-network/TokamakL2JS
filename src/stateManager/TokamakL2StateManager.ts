@@ -5,9 +5,8 @@ import { addHexPrefix, Address, bigIntToBytes, bigIntToHex, bytesToBigInt, bytes
 import { ethers } from "ethers";
 import { RLP } from "@ethereumjs/rlp";
 import { StateSnapshot, StorageKeysJson, StorageTrieDbEntryJson } from "../interface/channel/types.js";
-import { deriveStorageTrieKeyPrefix } from "../interface/channel/utils.js";
 import { TokamakL2MerkleTrees } from "./TokamakMerkleTrees.js";
-import { _normalizeStorageEntries, assertSnapshotStorageShape, assertStorageEntryCapacity, readStorageEntriesFromStorageTrie } from "./utils.js";
+import { _normalizeStorageEntries, assertSnapshotStorageShape, assertStorageEntryCapacity, deriveStorageTrieKeyPrefix, readStorageEntriesFromStorageTrie } from "./utils.js";
 
 export class TokamakL2StateManager extends MerkleStateManager implements StateManagerInterface {
     private _storageEntries: MerkleTreeMembers | null = null

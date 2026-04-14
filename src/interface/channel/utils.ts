@@ -1,6 +1,8 @@
 import {
+  addHexPrefix,
   Address,
   createAddressFromString,
+  hexToBytes,
 } from "@ethereumjs/util";
 import {
   StateSnapshot,
@@ -11,23 +13,6 @@ import {
   readStorageEntriesFromStorageTrie,
   readStorageValueFromTrie,
 } from "../../stateManager/utils.js";
-
-export function deriveStorageTrieKeyPrefix(
-  prefixStorageTrieKeys: boolean,
-  address: Address,
-  keccak256: ((msg: Uint8Array) => Uint8Array) | undefined,
-): Uint8Array | undefined {
-  if (!prefixStorageTrieKeys) {
-    return undefined;
-  }
-  if (keccak256 === undefined) {
-    throw new Error("customCrypto.keccak256 must be defined when storage trie key prefixing is enabled");
-  }
-
-  // Copy the keyPrefix derivation used by @ethereumjs/statemanager v10.1.1 MerkleStateManager when it creates storage tries.
-  const addressBytes = keccak256(address.bytes);
-  return addressBytes.slice(0, 7);
-}
 
 function getStorageAddressIndex(snapshot: StateSnapshot, storageAddress: Address | string): number {
   if (
@@ -50,6 +35,31 @@ function getStorageAddressIndex(snapshot: StateSnapshot, storageAddress: Address
 
   return index;
 }
+
+export const getStorageTrieKeyPrefix = (
+  snapshot: StateSnapshot,
+  storageAddressIndex: number,
+): Uint8Array | undefined => {
+  const rootHexWithoutPrefix = addHexPrefix(snapshot.storageTrieRoots[storageAddressIndex]).slice(2);
+  for (const entry of snapshot.storageTrieDb[storageAddressIndex]) {
+    const dbKeyWithoutPrefix = addHexPrefix(entry.key).slice(2);
+    if (dbKeyWithoutPrefix === rootHexWithoutPrefix) {
+      return undefined;
+    }
+    if (dbKeyWithoutPrefix.endsWith(rootHexWithoutPrefix)) {
+      const keyPrefixHex = dbKeyWithoutPrefix.slice(0, dbKeyWithoutPrefix.length - rootHexWithoutPrefix.length);
+      return keyPrefixHex.length === 0 ? undefined : hexToBytes(addHexPrefix(keyPrefixHex));
+    }
+  }
+
+  if (snapshot.storageTrieDb[storageAddressIndex].length === 0) {
+    return undefined;
+  }
+
+  throw new Error(
+    `Storage trie root ${snapshot.storageTrieRoots[storageAddressIndex]} does not have a matching trie DB entry at index ${storageAddressIndex}`,
+  );
+};
 
 export { readStorageEntriesFromStorageTrie } from "../../stateManager/utils.js";
 
