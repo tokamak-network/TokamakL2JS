@@ -15,6 +15,23 @@ import {
   StorageEntriesJson,
 } from "./types.js";
 
+export function deriveStorageTrieKeyPrefix(
+  prefixStorageTrieKeys: boolean,
+  address: Address,
+  keccak256: ((msg: Uint8Array) => Uint8Array) | undefined,
+): Uint8Array | undefined {
+  if (!prefixStorageTrieKeys) {
+    return undefined;
+  }
+  if (keccak256 === undefined) {
+    throw new Error("customCrypto.keccak256 must be defined when storage trie key prefixing is enabled");
+  }
+
+  // Copy the keyPrefix derivation used by @ethereumjs/statemanager v10.1.1 MerkleStateManager when it creates storage tries.
+  const addressBytes = keccak256(address.bytes);
+  return addressBytes.slice(0, 7);
+}
+
 function getStorageAddressIndex(snapshot: StateSnapshot, storageAddress: Address | string): number {
   if (
     snapshot.storageAddresses.length !== snapshot.storageKeys.length ||
@@ -63,9 +80,10 @@ async function createStorageTrieFromSnapshot(
   snapshot: StateSnapshot,
   storageAddressIndex: number,
 ): Promise<MerklePatriciaTrie> {
+  const common = createTokamakL2Common();
   const trie = new MerklePatriciaTrie({
     useKeyHashing: true,
-    common: createTokamakL2Common(),
+    common,
     keyPrefix: getStorageTrieKeyPrefix(snapshot, storageAddressIndex),
     db: new MapDB<string, Uint8Array>(),
   });

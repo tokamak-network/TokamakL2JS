@@ -5,8 +5,9 @@ import { addHexPrefix, Address, bigIntToBytes, bigIntToHex, bytesToBigInt, bytes
 import { ethers } from "ethers";
 import { RLP } from "@ethereumjs/rlp";
 import { StateSnapshot, StorageKeysJson, StorageTrieDbEntryJson } from "../interface/channel/types.js";
+import { deriveStorageTrieKeyPrefix, readStorageEntriesFromStateSnapshot } from "../interface/channel/utils.js";
 import { TokamakL2MerkleTrees } from "./TokamakMerkleTrees.js";
-import { assertSnapshotStorageShape, assertStorageEntryCapacity, deriveStorageTrieKeyPrefix } from "./utils.js";
+import { assertSnapshotStorageShape, assertStorageEntryCapacity } from "./utils.js";
 
 export class TokamakL2StateManager extends MerkleStateManager implements StateManagerInterface {
     private _storageEntries: MerkleTreeMembers | null = null
@@ -184,6 +185,7 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
         assertSnapshotStorageShape(snapshot)
         this._channelId = snapshot.channelId;
         const storageAddresses = snapshot.storageAddresses.map(addrStr => createAddressFromString(addrStr))
+        const snapshotStorageEntries = await readStorageEntriesFromStateSnapshot(snapshot)
         await this._initializeForAddresses(storageAddresses)
         for (const codeInfo of opts.contractCodes) {
             await this.putCode(codeInfo.address, hexToBytes(codeInfo.code));
@@ -207,18 +209,12 @@ export class TokamakL2StateManager extends MerkleStateManager implements StateMa
             account.storageRoot = hexToBytes(addHexPrefix(snapshot.storageTrieRoots[idx]))
             await this.putAccount(address, account)
 
-            const storageTrie = this._getStorageTrie(address, account)
             const normalizedEntries: { keyBigInt: bigint, valueBigInt: bigint }[] = []
 
-            for (const keyHex of snapshot.storageKeys[idx]) {
-                const key = hexToBytes(addHexPrefix(keyHex))
-                const keyBigInt = bytesToBigInt(key)
-
-                const encodedValue = await storageTrie.get(key)
-                const decodedValue = encodedValue === null ? new Uint8Array() : RLP.decode(encodedValue) as Uint8Array
-                const normalizedValue = unpadBytes(decodedValue)
+            for (const entry of snapshotStorageEntries[idx]) {
+                const keyBigInt = hexToBigInt(addHexPrefix(entry.key))
+                const normalizedValue = hexToBytes(addHexPrefix(entry.value))
                 const valueBigInt = normalizedValue.length === 0 ? 0n : bytesToBigInt(normalizedValue)
-
                 normalizedEntries.push({ keyBigInt, valueBigInt })
             }
 
